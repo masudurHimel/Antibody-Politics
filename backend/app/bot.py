@@ -206,5 +206,113 @@ def _needs_search(scored: list, state: GameState, my_seat: int) -> bool:
 
 
 def _mcts_lite(state: GameState, my_seat: int, candidates: list[tuple[Card, dict[str, Any]]]) -> Optional[tuple[Card, dict[str, Any]]]:
-    # Stubbed until Task 2.2 — return None to fall back to heuristic.
-    return None
+    import os
+    if os.environ.get("BOT_NO_SEARCH") == "1":
+        return None
+
+    budget_s = float(os.environ.get("BOT_BUDGET_S", "1.0"))
+    deadline = time.monotonic() + budget_s
+
+    unseen = _unseen_pool(state, my_seat)
+    if not unseen:
+        return None
+
+    rng = random.Random(state.turn_idx * 1009 + my_seat * 17)
+
+    scores: list[list[float]] = [[] for _ in candidates]
+    rollouts_per_cycle = 4
+    while time.monotonic() < deadline:
+        for i, (card, tgt) in enumerate(candidates):
+            for _ in range(rollouts_per_cycle):
+                if time.monotonic() >= deadline:
+                    break
+                outcome = _rollout(state, my_seat, card, tgt, unseen, rng)
+                scores[i].append(outcome)
+
+    means = [(sum(s) / len(s) if s else -2.0) for s in scores]
+    best_idx = max(range(len(candidates)), key=lambda i: means[i])
+    return candidates[best_idx]
+
+
+def _unseen_pool(state: GameState, my_seat: int) -> list[Card]:
+    full = build_deck()
+    seen_ids: set[str] = set()
+    for p in state.players:
+        for c in p.hand:
+            seen_ids.add(c.id)
+        for o in p.body:
+            for c in o.attached:
+                seen_ids.add(c.id)
+            # the organ itself was a card in the deck; its id was rewritten on play to "organ-XXX"
+            # so it is not in seen_ids by id. Approximate by removing one ORGAN of that color.
+    # We can't perfectly map back placed organs → original deck IDs because organ IDs are regenerated.
+    # Remove one organ-card of each placed organ's color as approximation.
+    placed_organs = [o for p in state.players for o in p.body]
+    pool = [c for c in full if c.id not in seen_ids]
+    by_color: dict[Color, list[Card]] = {}
+    for c in pool:
+        if c.type == CardType.ORGAN:
+            by_color.setdefault(c.color, []).append(c)
+    for o in placed_organs:
+        bucket = by_color.get(o.color, [])
+        if bucket:
+            victim = bucket.pop()
+            pool.remove(victim)
+    return pool
+
+
+def _rollout(state: GameState, my_seat: int, card: Card, tgt: dict[str, Any],
+             unseen: list[Card], rng: random.Random) -> float:
+    """Single determinized rollout. +1 self win, -1 any opponent win, 0 timeout/draw."""
+    from copy import deepcopy
+
+    sim = deepcopy(state)
+    pool = list(unseen)
+    rng.shuffle(pool)
+    sizes = [3 - len(sim.players[i].hand) if i == my_seat else 3 for i in range(4)]
+    # Deal determinized hands to opponents (their hand was empty in the reconstructed state)
+    for i in range(4):
+        if i == my_seat:
+            continue
+        for _ in range(3):  # opponents have hand_count=3 by default in reconstructed state
+            if pool:
+                sim.players[i].hand.append(pool.pop())
+    # The deck for the simulation is the remainder
+    sim.deck = pool
+
+    # Apply the candidate action
+    from .game import discard_cards, play_card
+    from .rules import IllegalAction
+    try:
+        play_card(sim, my_seat, card.id, tgt)
+    except IllegalAction:
+        return -0.5
+
+    # Continue with heuristic-only policies on all seats
+    plies = 0
+    max_plies = 60
+    while sim.winner_idx is None and plies < max_plies:
+        idx = sim.turn_idx
+        # pick best heuristic action
+        plays = _enumerate_plays(sim, idx)
+        if plays:
+            best = max(plays, key=lambda ct: heuristic_score(sim, idx, ct[0], ct[1]))
+            try:
+                play_card(sim, idx, best[0].id, best[1])
+            except IllegalAction:
+                # fall back to discard
+                if sim.players[idx].hand:
+                    discard_cards(sim, idx, [sim.players[idx].hand[0].id])
+                else:
+                    from .game import pass_turn
+                    pass_turn(sim, idx)
+        elif sim.players[idx].hand:
+            discard_cards(sim, idx, [sim.players[idx].hand[0].id])
+        else:
+            from .game import pass_turn
+            pass_turn(sim, idx)
+        plies += 1
+
+    if sim.winner_idx is None:
+        return 0.0
+    return 1.0 if sim.winner_idx == my_seat else -1.0
