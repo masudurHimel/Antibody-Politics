@@ -224,3 +224,20 @@ __marimo__/
 .idea/*
 .idea/workspace.xml
 .idea/Virus-Card-Game.iml
+
+# Backend
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/.pytest_cache/
+backend/*.egg-info/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/coverage/
+
+# Editor / OS
+.DS_Store
+*.pyc
