@@ -34,12 +34,12 @@ def test_advance_turn_skips_past_winner():
     assert state.turn_idx == 0
 
 
-def test_discard_cards_no_draw_this_turn():
+def test_discard_cards_refills_hand_to_three():
     state = start_game(game_id="g1", seed=42, names=["You", "B1", "B2", "B3"], bots=[False, True, True, True])
-    cards_to_discard = [state.players[0].hand[0].id]
+    cards_to_discard = [state.players[0].hand[0].id, state.players[0].hand[1].id]
     discard_cards(state, 0, cards_to_discard)
-    # discarding ends turn without redraw — hand drops to 2 and turn advances
-    assert len(state.players[0].hand) == 2
+    # discarding N cards refills hand back to 3 and advances turn
+    assert len(state.players[0].hand) == 3
     assert state.turn_idx == 1
 
 

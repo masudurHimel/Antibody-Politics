@@ -1,7 +1,8 @@
+import { useState } from "react";
+import Game from "./pages/Game";
+import NewGame from "./pages/NewGame";
+
 export default function App() {
-  return (
-    <div className="flex h-screen items-center justify-center text-2xl font-display">
-      Antibody Politics — bootstrap OK
-    </div>
-  );
+  const [gameId, setGameId] = useState<string | null>(null);
+  return gameId ? <Game /> : <NewGame onStart={(id) => setGameId(id)} />;
 }

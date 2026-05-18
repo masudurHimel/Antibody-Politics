@@ -83,6 +83,7 @@ def discard_cards(state: GameState, player_idx: int, card_ids: Sequence[str]) ->
         state.discard.append(card)
         moved.append(card.id)
     state.event_log.append(f"P{player_idx} discarded {len(moved)} card(s)")
+    draw_to_three(state, player_idx)
     advance_turn(state)
     return [state.event_log[-1]]
 

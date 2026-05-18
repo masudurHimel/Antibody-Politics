@@ -5,32 +5,181 @@
 :root[data-theme="dark"] {
   --bg: #0a0e1a;
   --surface: #131a2b;
+  --felt: radial-gradient(ellipse at center, #1a4d2e 0%, #0d2a18 70%, #061608 100%);
+  --felt-edge: #2d1b0e;
   --accent: #f5c43a;
+  --accent-2: #ff8a3d;
   --text: #f6f3ec;
-  --muted: #7c8398;
-  --card-back: #b1262f;
-  --c-red: #d24a4a;
-  --c-green: #4cae6a;
-  --c-blue: #4a80d2;
-  --c-yellow: #e8c34a;
+  --muted: #8a90a8;
+  --card-paper: #fbf6ec;
+  --card-paper-shade: #e8dcc0;
+  --card-ink: #1a1410;
+  --card-back-a: #c8242c;
+  --card-back-b: #7a0e15;
+  --c-red: #d23b3b;
+  --c-red-d: #8a1f1f;
+  --c-green: #2faa57;
+  --c-green-d: #1a6b34;
+  --c-blue: #2f6ed2;
+  --c-blue-d: #1b4380;
+  --c-yellow: #efb828;
+  --c-yellow-d: #a47710;
 }
 
 :root[data-theme="light"] {
-  --bg: #f5f3ee;
+  --bg: #efe7d6;
   --surface: #ffffff;
+  --felt: radial-gradient(ellipse at center, #2a7a4a 0%, #1d5234 70%, #0f2c1c 100%);
+  --felt-edge: #4a2d18;
   --accent: #c9961a;
+  --accent-2: #ee6b2f;
   --text: #1a1c22;
   --muted: #6b7286;
-  --card-back: #b1262f;
+  --card-paper: #fbf6ec;
+  --card-paper-shade: #e8dcc0;
+  --card-ink: #1a1410;
+  --card-back-a: #c8242c;
+  --card-back-b: #7a0e15;
   --c-red: #c83c3c;
-  --c-green: #3e9357;
-  --c-blue: #3a6cb8;
-  --c-yellow: #d6ad33;
+  --c-red-d: #7e1d1d;
+  --c-green: #2c9a4f;
+  --c-green-d: #16602e;
+  --c-blue: #2f6ed2;
+  --c-blue-d: #1b4380;
+  --c-yellow: #e0a91e;
+  --c-yellow-d: #8a620d;
 }
 
 html, body, #root { height: 100%; }
-body { font-family: var(--font-display, "Inter", system-ui, sans-serif); transition: background-color 250ms ease, color 250ms ease; }
+body {
+  font-family: var(--font-display, "Inter", system-ui, sans-serif);
+  background: var(--bg);
+  color: var(--text);
+  transition: background-color 250ms ease, color 250ms ease;
+  overflow: hidden;
+}
 * { -webkit-tap-highlight-color: transparent; }
+
+/* 3D perspective utilities — visual only, no transform on interactive layer */
+.scene-3d { perspective: 1600px; perspective-origin: 50% 35%; }
+.tilt-table { transform: none; }
+.preserve-3d { transform-style: preserve-3d; }
+.backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+
+/* Felt table surface */
+.felt {
+  background: var(--felt);
+  box-shadow:
+    inset 0 0 80px rgba(0,0,0,0.55),
+    inset 0 0 200px rgba(0,0,0,0.4),
+    0 30px 60px -20px rgba(0,0,0,0.7);
+  border: 6px solid var(--felt-edge);
+  border-radius: 32px;
+  position: relative;
+}
+.felt::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 26px;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(45deg, rgba(255,255,255,0.012) 0 2px, transparent 2px 5px),
+    repeating-linear-gradient(-45deg, rgba(0,0,0,0.025) 0 2px, transparent 2px 5px);
+}
+
+/* Card paper face — vintage card stock */
+.card-face {
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.55), transparent 50%),
+    linear-gradient(160deg, var(--card-paper) 0%, var(--card-paper-shade) 100%);
+  color: var(--card-ink);
+  box-shadow:
+    inset 0 0 0 2px rgba(0,0,0,0.08),
+    0 1px 0 rgba(255,255,255,0.6) inset,
+    0 10px 22px -8px rgba(0,0,0,0.55),
+    0 2px 4px rgba(0,0,0,0.3);
+}
+.card-face-3d {
+  transform-style: preserve-3d;
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 220ms;
+}
+.card-face-3d::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(255,255,255,0.35) 0%, transparent 38%, transparent 62%, rgba(0,0,0,0.18) 100%);
+  mix-blend-mode: overlay;
+  opacity: 0.9;
+}
+
+/* Colored card body (organ/virus/medicine) */
+.card-color-red    { background: linear-gradient(160deg, var(--c-red) 0%, var(--c-red-d) 100%); }
+.card-color-green  { background: linear-gradient(160deg, var(--c-green) 0%, var(--c-green-d) 100%); }
+.card-color-blue   { background: linear-gradient(160deg, var(--c-blue) 0%, var(--c-blue-d) 100%); }
+.card-color-yellow { background: linear-gradient(160deg, var(--c-yellow) 0%, var(--c-yellow-d) 100%); }
+.card-color-multi  {
+  background:
+    conic-gradient(from 220deg at 50% 50%,
+      var(--c-red) 0deg,
+      var(--c-yellow) 90deg,
+      var(--c-green) 180deg,
+      var(--c-blue) 270deg,
+      var(--c-red) 360deg);
+}
+
+/* Card back pattern — bold red Virus! style */
+.card-back-face {
+  background:
+    radial-gradient(ellipse at 50% 35%, rgba(255,255,255,0.18), transparent 60%),
+    linear-gradient(160deg, var(--card-back-a) 0%, var(--card-back-b) 100%);
+  box-shadow:
+    inset 0 0 0 6px rgba(255,255,255,0.06),
+    inset 0 0 0 8px rgba(0,0,0,0.25),
+    0 10px 20px -6px rgba(0,0,0,0.55);
+}
+
+/* Status rings on organs */
+.status-vaccinated { box-shadow: 0 0 0 3px rgba(255,255,255,0.85), 0 0 0 6px var(--c-green), 0 0 24px rgba(76,174,106,0.6); }
+.status-infected   { box-shadow: 0 0 0 3px rgba(255,255,255,0.85), 0 0 0 6px var(--c-red),   0 0 24px rgba(210,75,75,0.7);  }
+.status-immunized  {
+  box-shadow:
+    0 0 0 3px rgba(255,255,255,0.95),
+    0 0 0 6px var(--c-yellow),
+    0 0 36px rgba(245,196,58,0.85);
+  animation: gleam 2.2s ease-in-out infinite;
+}
+@keyframes gleam {
+  0%,100% { box-shadow: 0 0 0 3px rgba(255,255,255,0.95), 0 0 0 6px var(--c-yellow), 0 0 24px rgba(245,196,58,0.7); }
+  50%     { box-shadow: 0 0 0 3px rgba(255,255,255,1),    0 0 0 6px var(--c-yellow), 0 0 48px rgba(245,196,58,1);   }
+}
+
+/* Pulsing turn marker */
+@keyframes turn-pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(245,196,58,0.6); }
+  50%     { box-shadow: 0 0 0 14px rgba(245,196,58,0);  }
+}
+.turn-pulse { animation: turn-pulse 1.6s ease-out infinite; }
+
+/* Drop slot — dashed paper outline */
+.slot-empty {
+  background: repeating-linear-gradient(45deg, rgba(255,255,255,0.06) 0 6px, transparent 6px 12px);
+  border: 2px dashed rgba(255,255,255,0.18);
+  border-radius: 14px;
+}
+
+/* Drop slot when targetable */
+.slot-target { animation: target-pulse 1.2s ease-in-out infinite; cursor: pointer; }
+@keyframes target-pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(245,196,58,0.6),   inset 0 0 0 2px rgba(245,196,58,0.7); }
+  50%     { box-shadow: 0 0 0 10px rgba(245,196,58,0), inset 0 0 0 2px rgba(245,196,58,1);   }
+}
+
+/* Thin scrollbar for activity */
+.activity::-webkit-scrollbar { width: 6px; }
+.activity::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
