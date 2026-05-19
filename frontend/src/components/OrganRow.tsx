@@ -22,12 +22,14 @@ export function OrganRow({
   targetableIds,
   size = "clamp(80px, 14vh, 130px)",
   attachSize,
+  gap = 8,
 }: {
   organs: Organ[];
   onOrganClick?: (organ: Organ) => void;
   targetableIds?: Set<string>;
   size?: string;
   attachSize?: string;
+  gap?: number;
 }) {
   const attach = attachSize ?? `calc(${size} * 0.55)`;
   const slots: (Organ | null)[] = [
@@ -36,7 +38,7 @@ export function OrganRow({
   ].slice(0, 4);
 
   return (
-    <div className="flex gap-2 justify-center items-end" style={{ height: `calc(${size} + 14px)` }}>
+    <div className="flex justify-center items-end" style={{ height: `calc(${size} + 14px)`, gap: `${gap}px` }}>
       {slots.map((o, i) => {
         if (!o) {
           return (

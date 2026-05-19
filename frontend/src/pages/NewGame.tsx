@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { useStore } from "../game/store";
 import { connectWs } from "../game/ws";
+import { useIsMobile } from "../game/useMediaQuery";
 import { CardFront } from "../cards/CardFront";
 import type { Card } from "../game/types";
 
@@ -15,6 +16,9 @@ const hero: Card[] = [
 
 export default function NewGame({ onStart }: { onStart: (gameId: string) => void }) {
   const [busy, setBusy] = useState(false);
+  const isMobile = useIsMobile();
+  const spreadOffset = isMobile ? 42 : 90;
+  const cardH = isMobile ? "clamp(120px, 22vh, 180px)" : "clamp(170px, 30vh, 260px)";
 
   async function start() {
     setBusy(true);
@@ -72,7 +76,7 @@ export default function NewGame({ onStart }: { onStart: (gameId: string) => void
                 key={c.id}
                 style={{
                   position: "absolute",
-                  left: offset * 90,
+                  left: offset * spreadOffset,
                   transform: "translateX(-50%)",
                   zIndex: 10 - Math.abs(offset),
                 }}
@@ -98,7 +102,7 @@ export default function NewGame({ onStart }: { onStart: (gameId: string) => void
                     }px rgba(0,0,0,0.55))`,
                   }}
                 >
-                  <CardFront card={c} h="clamp(170px, 30vh, 260px)" />
+                  <CardFront card={c} h={cardH} />
                 </motion.div>
               </div>
             );
@@ -131,12 +135,14 @@ export default function NewGame({ onStart }: { onStart: (gameId: string) => void
           transition={{ type: "spring", damping: 14, stiffness: 200, delay: 0.1 }}
           className="font-chunky font-black tracking-widest text-center select-none"
           style={{
-            fontSize: "clamp(64px, 14vh, 180px)",
+            fontSize: "clamp(48px, min(14vh, 16vw), 180px)",
             color: "var(--accent)",
             textShadow:
               "0 8px 0 var(--c-red-d), 0 18px 40px rgba(0,0,0,0.7), 0 0 60px rgba(245,196,58,0.4)",
-            letterSpacing: "0.08em",
+            letterSpacing: "0.05em",
             lineHeight: 0.9,
+            padding: "0 12px",
+            whiteSpace: "nowrap",
           }}
         >
           VIRUS!

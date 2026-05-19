@@ -3,6 +3,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { useStore } from "../game/store";
 import { connectWs } from "../game/ws";
+import { useIsMobile } from "../game/useMediaQuery";
 import { CardFront } from "../cards/CardFront";
 const hero = [
     { id: "h-organ", type: "organ", color: "red" },
@@ -13,6 +14,9 @@ const hero = [
 ];
 export default function NewGame({ onStart }) {
     const [busy, setBusy] = useState(false);
+    const isMobile = useIsMobile();
+    const spreadOffset = isMobile ? 42 : 90;
+    const cardH = isMobile ? "clamp(120px, 22vh, 180px)" : "clamp(170px, 30vh, 260px)";
     async function start() {
         setBusy(true);
         const r = await fetch("/api/games", {
@@ -41,7 +45,7 @@ export default function NewGame({ onStart }) {
                             const offset = i - (hero.length - 1) / 2;
                             return (_jsx("div", { style: {
                                     position: "absolute",
-                                    left: offset * 90,
+                                    left: offset * spreadOffset,
                                     transform: "translateX(-50%)",
                                     zIndex: 10 - Math.abs(offset),
                                 }, children: _jsx(motion.div, { initial: { y: -260, opacity: 0, rotate: offset * 4, scale: 0.7 }, animate: {
@@ -57,7 +61,7 @@ export default function NewGame({ onStart }) {
                                     }, style: {
                                         transformOrigin: "bottom center",
                                         filter: `drop-shadow(0 ${10 + Math.abs(offset) * 4}px ${14 + Math.abs(offset) * 6}px rgba(0,0,0,0.55))`,
-                                    }, children: _jsx(CardFront, { card: c, h: "clamp(170px, 30vh, 260px)" }) }) }, c.id));
+                                    }, children: _jsx(CardFront, { card: c, h: cardH }) }) }, c.id));
                         }), _jsx(motion.div, { animate: { rotate: [0, 8, -6, 0] }, transition: { duration: 6, repeat: Infinity, ease: "easeInOut" }, className: "absolute", style: {
                                 left: -200,
                                 top: -120,
@@ -67,11 +71,13 @@ export default function NewGame({ onStart }) {
                                 borderRadius: "50%",
                                 background: "rgba(245,196,58,0.25)",
                             } })] }) }), _jsx("div", { className: "absolute inset-x-0 flex justify-center pointer-events-none", style: { top: "2%" }, children: _jsx(motion.h1, { initial: { scale: 0.6, opacity: 0, y: -50 }, animate: { scale: 1, opacity: 1, y: 0 }, transition: { type: "spring", damping: 14, stiffness: 200, delay: 0.1 }, className: "font-chunky font-black tracking-widest text-center select-none", style: {
-                        fontSize: "clamp(64px, 14vh, 180px)",
+                        fontSize: "clamp(48px, min(14vh, 16vw), 180px)",
                         color: "var(--accent)",
                         textShadow: "0 8px 0 var(--c-red-d), 0 18px 40px rgba(0,0,0,0.7), 0 0 60px rgba(245,196,58,0.4)",
-                        letterSpacing: "0.08em",
+                        letterSpacing: "0.05em",
                         lineHeight: 0.9,
+                        padding: "0 12px",
+                        whiteSpace: "nowrap",
                     }, children: "VIRUS!" }) }), _jsxs("div", { className: "absolute inset-x-0 flex flex-col items-center gap-4", style: { bottom: "8%" }, children: [_jsx(motion.button, { onClick: start, disabled: busy, initial: { opacity: 0, y: 30 }, animate: { opacity: 1, y: 0 }, transition: { delay: 0.8 }, whileHover: { scale: 1.05, boxShadow: "0 0 60px rgba(245,196,58,0.7)" }, whileTap: { scale: 0.96 }, className: "font-chunky text-xl tracking-[0.25em] rounded-full px-12 py-5 relative overflow-hidden", style: {
                             background: "linear-gradient(180deg, var(--accent) 0%, #d4a01b 100%)",
                             color: "var(--bg)",

@@ -13,13 +13,13 @@ const statusLabel = {
     infected: "INFECTED",
     immunized: "IMMUNIZED",
 };
-export function OrganRow({ organs, onOrganClick, targetableIds, size = "clamp(80px, 14vh, 130px)", attachSize, }) {
+export function OrganRow({ organs, onOrganClick, targetableIds, size = "clamp(80px, 14vh, 130px)", attachSize, gap = 8, }) {
     const attach = attachSize ?? `calc(${size} * 0.55)`;
     const slots = [
         ...organs,
         ...Array(Math.max(0, 4 - organs.length)).fill(null),
     ].slice(0, 4);
-    return (_jsx("div", { className: "flex gap-2 justify-center items-end", style: { height: `calc(${size} + 14px)` }, children: slots.map((o, i) => {
+    return (_jsx("div", { className: "flex justify-center items-end", style: { height: `calc(${size} + 14px)`, gap: `${gap}px` }, children: slots.map((o, i) => {
             if (!o) {
                 return (_jsx("div", { className: "slot-empty", style: { height: size, aspectRatio: "2 / 3" }, "aria-label": "empty organ slot" }, `empty-${i}`));
             }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../game/store";
 import { discardCards, passTurn, playCard } from "../game/actions";
+import { useIsMobile } from "../game/useMediaQuery";
 import { BoardSeat } from "../components/BoardSeat";
 import { Hand } from "../components/Hand";
 import { OrganRow } from "../components/OrganRow";
@@ -10,6 +11,7 @@ import { Settings } from "../components/Settings";
 import { Toast } from "../components/Toast";
 import { Banner } from "../components/Banner";
 import { Avatar } from "../components/Avatar";
+import { MobileMenu } from "../components/MobileMenu";
 import { CardBack } from "../cards/CardBack";
 import { CardFront } from "../cards/CardFront";
 import type { Card, Organ } from "../game/types";
@@ -39,7 +41,9 @@ function needsPlayerTarget(card: Card): boolean {
 export default function Game() {
   const snap = useStore((s) => s.snapshot);
   const selection = useStore((s) => s.selection);
+  const isMobile = useIsMobile();
   const [pendingFromOrgan, setPendingFromOrgan] = useState<{ player: number; organ_id: string } | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   if (!snap) {
     return (
@@ -120,6 +124,144 @@ export default function Game() {
 
   const playEnabled = myTurn && !gameOver && !!singleCard && isNoTargetCard(singleCard);
   const discardEnabled = myTurn && !gameOver && selection.length >= 1;
+
+  if (isMobile) {
+    return (
+      <div className="h-screen w-screen overflow-hidden bg-bg text-text flex flex-col">
+        {/* Top app bar */}
+        <header
+          className="flex items-center justify-between px-3 safe-top"
+          style={{ height: 48, flexShrink: 0, background: "rgba(0,0,0,0.35)" }}
+        >
+          <h1 className="font-chunky tracking-widest text-sm">VIRUS!</h1>
+          <div
+            className="px-2.5 py-1 rounded-full font-chunky text-[10px] tracking-widest truncate"
+            style={{
+              maxWidth: "55%",
+              background: myTurn ? "var(--accent)" : "rgba(0,0,0,0.5)",
+              color: myTurn ? "var(--bg)" : "white",
+              boxShadow: myTurn ? "0 0 14px rgba(245,196,58,0.55)" : "none",
+            }}
+          >
+            {myTurn ? "YOUR TURN" : `${snap.players[snap.turn_idx]?.name?.toUpperCase()}'S TURN`}
+          </div>
+          <button
+            type="button"
+            onClick={() => setMenuOpen(true)}
+            aria-label="Open menu"
+            className="rounded-full flex items-center justify-center font-chunky"
+            style={{
+              width: 36,
+              height: 36,
+              background: "rgba(255,255,255,0.1)",
+              color: "var(--text)",
+              fontSize: 18,
+            }}
+          >
+            ☰
+          </button>
+        </header>
+
+        {/* Felt container */}
+        <main className="flex-1 min-h-0 p-2 flex flex-col">
+          <div className="felt flex-1 min-h-0 flex flex-col p-2 gap-2 overflow-hidden">
+            {/* Bot row */}
+            <div className="flex items-stretch gap-1.5" style={{ minHeight: "20vh" }}>
+              <BoardSeat
+                player={snap.players[1]}
+                compact
+                onOrganClick={(o) => handleOrganClick(o, 1)}
+                targetableIds={targetable?.[1]}
+                selectablePlayer={selPlayerTargetable}
+                onSelectPlayer={() => handlePlayerClick(1)}
+              />
+              <BoardSeat
+                player={snap.players[2]}
+                compact
+                onOrganClick={(o) => handleOrganClick(o, 2)}
+                targetableIds={targetable?.[2]}
+                selectablePlayer={selPlayerTargetable}
+                onSelectPlayer={() => handlePlayerClick(2)}
+              />
+              <BoardSeat
+                player={snap.players[3]}
+                compact
+                onOrganClick={(o) => handleOrganClick(o, 3)}
+                targetableIds={targetable?.[3]}
+                selectablePlayer={selPlayerTargetable}
+                onSelectPlayer={() => handlePlayerClick(3)}
+              />
+            </div>
+
+            {/* Deck / discard band */}
+            <div className="flex justify-center">
+              <div
+                className="flex items-center gap-3 px-3 py-1.5 rounded-2xl"
+                style={{ background: "rgba(0,0,0,0.28)", border: "1px solid rgba(255,255,255,0.08)" }}
+              >
+                <div className="text-center">
+                  <CardBack h="clamp(54px, 8vh, 72px)" />
+                  <div className="font-chunky text-[9px] mt-0.5 text-white/80 tracking-wider">DECK · {snap.deck_count}</div>
+                </div>
+                <div className="text-center">
+                  {snap.discard_top ? (
+                    <div style={{ transform: "rotate(-5deg)" }}>
+                      <CardFront card={snap.discard_top} h="clamp(54px, 8vh, 72px)" />
+                    </div>
+                  ) : (
+                    <div className="slot-empty" style={{ height: "clamp(54px, 8vh, 72px)", aspectRatio: "2/3" }} />
+                  )}
+                  <div className="font-chunky text-[9px] mt-0.5 text-white/80 tracking-wider">DISCARD · {snap.discard_count}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Human organ row */}
+            <div className="flex justify-center items-end pt-1">
+              <OrganRow
+                organs={human.body}
+                targetableIds={targetable?.[0]}
+                onOrganClick={(o) => handleOrganClick(o, 0)}
+                size="clamp(54px, 9vh, 78px)"
+              />
+            </div>
+
+            {/* Hand strip */}
+            <div className="flex-1 min-h-0 flex items-end justify-stretch">
+              <Hand cards={human.hand ?? []} active={myTurn && !gameOver} />
+            </div>
+          </div>
+        </main>
+
+        {/* Action bar */}
+        <div
+          className="flex items-stretch gap-2 px-3 pt-2 safe-bottom"
+          style={{ background: "rgba(0,0,0,0.35)", flexShrink: 0 }}
+        >
+          <button
+            onClick={handlePlay}
+            disabled={!playEnabled}
+            className="flex-1 rounded-xl font-chunky text-base tracking-widest disabled:opacity-25 transition shadow-card"
+            style={{ background: "var(--accent)", color: "var(--bg)", minHeight: 52 }}
+          >
+            PLAY
+          </button>
+          <button
+            onClick={handleDiscard}
+            disabled={!discardEnabled}
+            className="flex-1 rounded-xl font-chunky text-base tracking-widest disabled:opacity-25 transition shadow-card"
+            style={{ background: "var(--c-red)", color: "white", minHeight: 52 }}
+          >
+            DISCARD{selection.length > 0 ? ` ${selection.length}` : ""}
+          </button>
+        </div>
+
+        <MobileMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
+        <Toast />
+        <Banner />
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-bg text-text">

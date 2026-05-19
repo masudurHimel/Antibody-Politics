@@ -13,6 +13,7 @@ export function BoardSeat({
   targetableIds,
   selectablePlayer,
   onSelectPlayer,
+  compact = false,
 }: {
   player: PlayerView;
   align?: "left" | "center" | "right";
@@ -20,6 +21,7 @@ export function BoardSeat({
   targetableIds?: Set<string>;
   selectablePlayer?: boolean;
   onSelectPlayer?: () => void;
+  compact?: boolean;
 }) {
   const thinkingPlayer = useStore((s) => s.botThinking.player);
   const isThinking = thinkingPlayer === player.idx;
@@ -27,6 +29,91 @@ export function BoardSeat({
   const gameId = useStore((s) => s.snapshot?.game_id ?? "");
   const isActive = turnIdx === player.idx;
   const avatarSeed = `${gameId}:${player.idx}`;
+
+  if (compact) {
+    return (
+      <motion.div
+        variants={seatPulse}
+        animate={isActive ? "active" : "idle"}
+        className={`flex flex-col items-center gap-1 rounded-xl px-1 py-1 flex-1 min-w-0 overflow-hidden ${
+          isActive ? "ring-2 ring-accent shadow-[0_0_18px_rgba(245,196,58,0.35)]" : ""
+        } ${selectablePlayer ? "cursor-pointer hover:ring-2 hover:ring-accent2" : ""}`}
+        style={{
+          background: "rgba(0,0,0,0.22)",
+          backdropFilter: "blur(2px)",
+          border: "1px solid rgba(255,255,255,0.06)",
+        }}
+      >
+        {/* avatar with hand-count badge */}
+        <div
+          className="relative"
+          onClick={selectablePlayer ? onSelectPlayer : undefined}
+          style={{ width: 36, height: 36, minWidth: 36, minHeight: 36 }}
+        >
+          <div
+            className={`${isActive ? "turn-pulse" : ""}`}
+            style={{
+              width: "100%",
+              height: "100%",
+              borderRadius: "50%",
+              boxShadow: isActive
+                ? "0 0 0 2px var(--accent), 0 2px 8px rgba(0,0,0,0.45)"
+                : "0 2px 8px rgba(0,0,0,0.4)",
+              overflow: "hidden",
+            }}
+          >
+            <Avatar seed={avatarSeed} size="100%" />
+          </div>
+          <div
+            className="absolute -top-1 -right-1 rounded-full font-chunky flex items-center justify-center"
+            style={{
+              minWidth: 16,
+              height: 16,
+              padding: "0 4px",
+              fontSize: 9,
+              background: "var(--accent)",
+              color: "var(--bg)",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.6)",
+            }}
+            aria-label={`${player.hand_count} cards in hand`}
+          >
+            {player.hand_count}
+          </div>
+        </div>
+
+        {/* name */}
+        <div
+          className="font-display font-semibold truncate w-full text-center"
+          style={{ fontSize: 10, maxWidth: "10ch", lineHeight: 1.1 }}
+        >
+          {player.name}
+        </div>
+
+        {/* thinking indicator */}
+        {isThinking && (
+          <motion.div
+            animate={{ opacity: [0.3, 1, 0.3] }}
+            transition={{ repeat: Infinity, duration: 1.2 }}
+            className="text-muted"
+            style={{ fontSize: 8, lineHeight: 1, marginTop: -2 }}
+          >
+            thinking…
+          </motion.div>
+        )}
+
+        {/* compact organ row */}
+        <div className="w-full flex justify-center overflow-hidden">
+          <OrganRow
+            organs={player.body}
+            size="clamp(22px, 4.6vh, 32px)"
+            onOrganClick={onOrganClick}
+            targetableIds={targetableIds}
+            gap={3}
+          />
+        </div>
+      </motion.div>
+    );
+  }
 
   const organSize = "clamp(50px, 8.5vh, 80px)";
   const handBackH = "clamp(42px, 7.5vh, 72px)";
