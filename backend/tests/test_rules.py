@@ -72,10 +72,12 @@ def test_play_virus_on_infected_organ_destroys_it():
     s.players[0].hand.append(virus)
     apply_play(s, 0, virus.id, {"player": 1, "organ_id": "o-r"})
     assert organ not in s.players[1].body
-    # all 3 cards (organ as a card? no — organ is removed; both viruses go to discard)
+    # both viruses AND the organ card itself go to discard (Virus! rule: destroyed organs return to circulation)
     discard_ids = {c.id for c in s.discard}
     assert "v-r-existing" in discard_ids
     assert "v-r-1" in discard_ids
+    discarded_organs = [c for c in s.discard if c.type == CardType.ORGAN and c.color == Color.RED]
+    assert len(discarded_organs) == 1, "destroyed organ must return to discard so the deck can recycle it"
 
 
 def test_play_virus_on_vaccinated_organ_removes_medicine_back_to_free():

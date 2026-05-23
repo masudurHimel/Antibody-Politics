@@ -14,7 +14,13 @@ const hero: Card[] = [
   { id: "h-organ2", type: "organ", color: "yellow" },
 ];
 
-export default function NewGame({ onStart }: { onStart: (gameId: string) => void }) {
+export default function NewGame({
+  onStart,
+  onMultiplayer,
+}: {
+  onStart: (gameId: string) => void;
+  onMultiplayer: () => void;
+}) {
   const [busy, setBusy] = useState(false);
   const isMobile = useIsMobile();
   const spreadOffset = isMobile ? 42 : 90;
@@ -168,6 +174,18 @@ export default function NewGame({ onStart }: { onStart: (gameId: string) => void
           }}
         >
           {busy ? "DEALING…" : "DEAL"}
+        </motion.button>
+
+        <motion.button
+          onClick={onMultiplayer}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.0 }}
+          whileHover={{ scale: 1.04 }}
+          whileTap={{ scale: 0.96 }}
+          className="font-chunky text-sm tracking-[0.3em] rounded-full px-8 py-3 border border-white/40 text-white/90"
+        >
+          MULTIPLAYER
         </motion.button>
 
         <motion.div

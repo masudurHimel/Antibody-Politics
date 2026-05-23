@@ -14,6 +14,8 @@ import { Avatar } from "../components/Avatar";
 import { MobileMenu } from "../components/MobileMenu";
 import { CardBack } from "../cards/CardBack";
 import { CardFront } from "../cards/CardFront";
+import { TurnTimer } from "../components/TurnTimer";
+import { PauseOverlay } from "../components/PauseOverlay";
 import type { Card, Organ } from "../game/types";
 
 function findCard(hand: Card[] | null, id: string | null): Card | null {
@@ -44,8 +46,39 @@ export default function Game() {
   const isMobile = useIsMobile();
   const [pendingFromOrgan, setPendingFromOrgan] = useState<{ player: number; organ_id: string } | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const autoPassedFor = useRef<string | null>(null);
 
-  if (!snap) {
+  const viewerIdx = snap?.viewer_idx ?? 0;
+  const human = snap ? snap.players[viewerIdx] : null;
+  const myTurn = !!snap && snap.turn_idx === viewerIdx;
+  const gameOver = !!snap && snap.winner_idx !== null;
+  const singleId = selection.length === 1 ? selection[0] : null;
+  const singleCard = findCard(human?.hand ?? null, singleId);
+
+  // Auto-pass when it's our turn but our hand is empty (e.g. a bot just played Latex Glove).
+  // Server only legalises pass with an empty hand, so this is the only valid move.
+  useEffect(() => {
+    if (!snap || !human || !myTurn || gameOver) return;
+    const handLen = human.hand?.length ?? 0;
+    if (handLen > 0) return;
+    const key = `${snap.game_id}:${snap.turn_idx}:${snap.discard_count}`;
+    if (autoPassedFor.current === key) return;
+    autoPassedFor.current = key;
+    passTurn();
+  }, [snap, human, myTurn, gameOver]);
+
+  const targetable = useMemo(() => {
+    if (!snap || !singleCard) return undefined;
+    if (needsOrganTarget(singleCard)) {
+      const all: Record<number, Set<string>> = {};
+      for (const p of snap.players)
+        all[p.idx] = new Set(p.body.filter((o) => o.status !== "immunized").map((o) => o.id));
+      return all;
+    }
+    return undefined;
+  }, [singleCard, snap]);
+
+  if (!snap || !human) {
     return (
       <div className="flex h-screen items-center justify-center bg-bg text-text">
         <div className="font-chunky text-2xl">DEALING…</div>
@@ -53,24 +86,11 @@ export default function Game() {
     );
   }
 
-  const human = snap.players[0];
-  const myTurn = snap.turn_idx === 0;
-  const gameOver = snap.winner_idx !== null;
-  const singleId = selection.length === 1 ? selection[0] : null;
-  const singleCard = findCard(human.hand, singleId);
-
-  // Auto-pass when it's our turn but our hand is empty (e.g. a bot just played Latex Glove).
-  // Server only legalises pass with an empty hand, so this is the only valid move.
-  const autoPassedFor = useRef<string | null>(null);
-  useEffect(() => {
-    if (!myTurn || gameOver) return;
-    const handLen = human.hand?.length ?? 0;
-    if (handLen > 0) return;
-    const key = `${snap.game_id}:${snap.turn_idx}:${snap.discard_count}`;
-    if (autoPassedFor.current === key) return;
-    autoPassedFor.current = key;
-    passTurn();
-  }, [myTurn, gameOver, human.hand, snap.game_id, snap.turn_idx, snap.discard_count]);
+  // Map the three opponent slots to seats relative to the viewer.
+  // Bottom = viewerIdx; left = +1; top = +2; right = +3 (mod 4).
+  const seatLeft = (viewerIdx + 1) % snap.players.length;
+  const seatTop = (viewerIdx + 2) % snap.players.length;
+  const seatRight = (viewerIdx + 3) % snap.players.length;
 
   function handleOrganClick(organ: Organ, ownerIdx: number) {
     if (!singleCard) return;
@@ -108,17 +128,6 @@ export default function Game() {
       discardCards(selection);
     }
   }
-
-  const targetable = useMemo(() => {
-    if (!singleCard) return undefined;
-    if (needsOrganTarget(singleCard)) {
-      const all: Record<number, Set<string>> = {};
-      for (const p of snap.players)
-        all[p.idx] = new Set(p.body.filter((o) => o.status !== "immunized").map((o) => o.id));
-      return all;
-    }
-    return undefined;
-  }, [singleCard, snap]);
 
   const selPlayerTargetable = singleCard ? needsPlayerTarget(singleCard) : false;
 
@@ -165,32 +174,19 @@ export default function Game() {
         {/* Felt container */}
         <main className="flex-1 min-h-0 p-2 flex flex-col">
           <div className="felt flex-1 min-h-0 flex flex-col p-2 gap-2 overflow-hidden">
-            {/* Bot row */}
+            {/* Opponent row (left, top, right relative to viewer) */}
             <div className="flex items-stretch gap-1.5" style={{ minHeight: "20vh" }}>
-              <BoardSeat
-                player={snap.players[1]}
-                compact
-                onOrganClick={(o) => handleOrganClick(o, 1)}
-                targetableIds={targetable?.[1]}
-                selectablePlayer={selPlayerTargetable}
-                onSelectPlayer={() => handlePlayerClick(1)}
-              />
-              <BoardSeat
-                player={snap.players[2]}
-                compact
-                onOrganClick={(o) => handleOrganClick(o, 2)}
-                targetableIds={targetable?.[2]}
-                selectablePlayer={selPlayerTargetable}
-                onSelectPlayer={() => handlePlayerClick(2)}
-              />
-              <BoardSeat
-                player={snap.players[3]}
-                compact
-                onOrganClick={(o) => handleOrganClick(o, 3)}
-                targetableIds={targetable?.[3]}
-                selectablePlayer={selPlayerTargetable}
-                onSelectPlayer={() => handlePlayerClick(3)}
-              />
+              {[seatLeft, seatTop, seatRight].map((seat) => (
+                <BoardSeat
+                  key={seat}
+                  player={snap.players[seat]}
+                  compact
+                  onOrganClick={(o) => handleOrganClick(o, seat)}
+                  targetableIds={targetable?.[seat]}
+                  selectablePlayer={selPlayerTargetable}
+                  onSelectPlayer={() => handlePlayerClick(seat)}
+                />
+              ))}
             </div>
 
             {/* Deck / discard band */}
@@ -220,8 +216,8 @@ export default function Game() {
             <div className="flex justify-center items-end pt-1">
               <OrganRow
                 organs={human.body}
-                targetableIds={targetable?.[0]}
-                onOrganClick={(o) => handleOrganClick(o, 0)}
+                targetableIds={targetable?.[viewerIdx]}
+                onOrganClick={(o) => handleOrganClick(o, viewerIdx)}
                 size="clamp(54px, 9vh, 78px)"
               />
             </div>
@@ -283,15 +279,15 @@ export default function Game() {
               {myTurn ? "YOUR TURN" : `${snap.players[snap.turn_idx]?.name?.toUpperCase()}'S TURN`}
             </div>
 
-            {/* Top bot (seat 2) */}
+            {/* Top opponent (seat across from viewer) */}
             <div className="flex justify-center items-start pt-6" style={{ height: "24%" }}>
               <BoardSeat
-                player={snap.players[2]}
+                player={snap.players[seatTop]}
                 align="center"
-                onOrganClick={(o) => handleOrganClick(o, 2)}
-                targetableIds={targetable?.[2]}
+                onOrganClick={(o) => handleOrganClick(o, seatTop)}
+                targetableIds={targetable?.[seatTop]}
                 selectablePlayer={selPlayerTargetable}
-                onSelectPlayer={() => handlePlayerClick(2)}
+                onSelectPlayer={() => handlePlayerClick(seatTop)}
               />
             </div>
 
@@ -299,12 +295,12 @@ export default function Game() {
             <div className="grid grid-cols-[1fr_auto_1fr] gap-3 items-center" style={{ height: "27%" }}>
               <div className="flex justify-start">
                 <BoardSeat
-                  player={snap.players[1]}
+                  player={snap.players[seatLeft]}
                   align="left"
-                  onOrganClick={(o) => handleOrganClick(o, 1)}
-                  targetableIds={targetable?.[1]}
+                  onOrganClick={(o) => handleOrganClick(o, seatLeft)}
+                  targetableIds={targetable?.[seatLeft]}
                   selectablePlayer={selPlayerTargetable}
-                  onSelectPlayer={() => handlePlayerClick(1)}
+                  onSelectPlayer={() => handlePlayerClick(seatLeft)}
                 />
               </div>
 
@@ -330,12 +326,12 @@ export default function Game() {
 
               <div className="flex justify-end">
                 <BoardSeat
-                  player={snap.players[3]}
+                  player={snap.players[seatRight]}
                   align="right"
-                  onOrganClick={(o) => handleOrganClick(o, 3)}
-                  targetableIds={targetable?.[3]}
+                  onOrganClick={(o) => handleOrganClick(o, seatRight)}
+                  targetableIds={targetable?.[seatRight]}
                   selectablePlayer={selPlayerTargetable}
-                  onSelectPlayer={() => handlePlayerClick(3)}
+                  onSelectPlayer={() => handlePlayerClick(seatRight)}
                 />
               </div>
             </div>
@@ -344,8 +340,8 @@ export default function Game() {
             <div className="flex justify-center items-end" style={{ height: "13%" }}>
               <OrganRow
                 organs={human.body}
-                targetableIds={targetable?.[0]}
-                onOrganClick={(o) => handleOrganClick(o, 0)}
+                targetableIds={targetable?.[viewerIdx]}
+                onOrganClick={(o) => handleOrganClick(o, viewerIdx)}
                 size="clamp(72px, 11.5vh, 110px)"
               />
             </div>
@@ -445,6 +441,19 @@ export default function Game() {
 
       <Toast />
       <Banner />
+      <MultiplayerHUD />
+      <PauseOverlay />
+    </div>
+  );
+}
+
+function MultiplayerHUD() {
+  const turnDeadline = useStore((s) => s.turnDeadline);
+  const room = useStore((s) => s.room);
+  if (!room || turnDeadline == null) return null;
+  return (
+    <div className="fixed top-3 right-3 z-40 px-3 py-2 rounded-full border border-white/20 bg-black/40 backdrop-blur">
+      <TurnTimer deadlineMs={turnDeadline} />
     </div>
   );
 }

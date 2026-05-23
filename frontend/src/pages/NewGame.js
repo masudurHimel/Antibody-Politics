@@ -12,7 +12,7 @@ const hero = [
     { id: "h-treatment", type: "treatment", color: "multi", treatment_kind: "organ_thief" },
     { id: "h-organ2", type: "organ", color: "yellow" },
 ];
-export default function NewGame({ onStart }) {
+export default function NewGame({ onStart, onMultiplayer, }) {
     const [busy, setBusy] = useState(false);
     const isMobile = useIsMobile();
     const spreadOffset = isMobile ? 42 : 90;
@@ -82,5 +82,5 @@ export default function NewGame({ onStart }) {
                             background: "linear-gradient(180deg, var(--accent) 0%, #d4a01b 100%)",
                             color: "var(--bg)",
                             boxShadow: "0 18px 40px -10px rgba(0,0,0,0.6), inset 0 -4px 0 rgba(0,0,0,0.18), inset 0 2px 0 rgba(255,255,255,0.55)",
-                        }, children: busy ? "DEALING…" : "DEAL" }), _jsxs(motion.div, { initial: { opacity: 0 }, animate: { opacity: 0.6 }, transition: { delay: 1.2 }, className: "flex items-center gap-2 text-xs tracking-[0.3em] text-white/70 font-chunky", children: [_jsx("span", { children: "4" }), _jsx("span", { className: "w-1 h-1 rounded-full bg-white/50" }), _jsx("span", { children: "SEATS" }), _jsx("span", { className: "w-1 h-1 rounded-full bg-white/50" }), _jsx("span", { children: "68" }), _jsx("span", { className: "w-1 h-1 rounded-full bg-white/50" }), _jsx("span", { children: "CARDS" })] })] })] }));
+                        }, children: busy ? "DEALING…" : "DEAL" }), _jsx(motion.button, { onClick: onMultiplayer, initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { delay: 1.0 }, whileHover: { scale: 1.04 }, whileTap: { scale: 0.96 }, className: "font-chunky text-sm tracking-[0.3em] rounded-full px-8 py-3 border border-white/40 text-white/90", children: "MULTIPLAYER" }), _jsxs(motion.div, { initial: { opacity: 0 }, animate: { opacity: 0.6 }, transition: { delay: 1.2 }, className: "flex items-center gap-2 text-xs tracking-[0.3em] text-white/70 font-chunky", children: [_jsx("span", { children: "4" }), _jsx("span", { className: "w-1 h-1 rounded-full bg-white/50" }), _jsx("span", { children: "SEATS" }), _jsx("span", { className: "w-1 h-1 rounded-full bg-white/50" }), _jsx("span", { children: "68" }), _jsx("span", { className: "w-1 h-1 rounded-full bg-white/50" }), _jsx("span", { children: "CARDS" })] })] })] }));
 }

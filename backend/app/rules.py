@@ -132,10 +132,11 @@ def _apply_attach(state: GameState, source: Player, card: Card, targets: dict[st
             state.discard.append(card)
             events.append(f"P{source.idx} virus stripped P{target_player.idx}'s {organ.color.value} vaccine")
         elif organ.status == OrganStatus.INFECTED:
-            # destroy organ — organ leaves body; both viruses to discard
+            # destroy organ — both viruses AND the organ card itself go to discard so the deck can recycle them
             for c in list(organ.attached):
                 state.discard.append(c)
             state.discard.append(card)
+            state.discard.append(Card(id=f"organ-{uuid.uuid4().hex[:8]}", type=CardType.ORGAN, color=organ.color))
             target_player.body.remove(organ)
             events.append(f"P{source.idx} destroyed P{target_player.idx}'s {organ.color.value} organ")
         else:  # FREE

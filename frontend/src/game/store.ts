@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ClientMessage, ServerEvent, Snapshot } from "./types";
+import type { ClientMessage, RoomView, ServerEvent, Snapshot } from "./types";
 
 type ConnStatus = "idle" | "connecting" | "open" | "closed";
 
@@ -17,6 +17,15 @@ interface State {
   botThinking: { player: number | null; since: number };
   toast: string | null;
 
+  // Multiplayer
+  room: RoomView | null;
+  mySeat: number | null;
+  playerToken: string | null;
+  turnDeadline: number | null;
+  isPaused: boolean;
+  waitingFor: number[];
+  terminated: boolean;
+
   setSnapshot: (s: Snapshot) => void;
   pushEvents: (e: string[]) => void;
   toggleSelect: (id: string) => void;
@@ -28,6 +37,9 @@ interface State {
   attach: (gameId: string, ws: WebSocket) => void;
   send: (msg: ClientMessage) => void;
   applyServerEvent: (ev: ServerEvent) => void;
+
+  setRoomContext: (roomId: string, token: string, seat: number) => void;
+  clearRoom: () => void;
 }
 
 const initialTheme: "light" | "dark" =
@@ -49,6 +61,14 @@ export const useStore = create<State>((set, get) => ({
   soundOn: localStorage.getItem("soundOn") !== "0",
   botThinking: { player: null, since: 0 },
   toast: null,
+
+  room: null,
+  mySeat: null,
+  playerToken: null,
+  turnDeadline: null,
+  isPaused: false,
+  waitingFor: [],
+  terminated: false,
 
   setSnapshot: (s) => set({ snapshot: s }),
   pushEvents: (e) => set((st) => ({ events: [...st.events, ...e].slice(-40) })),
@@ -74,6 +94,20 @@ export const useStore = create<State>((set, get) => ({
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
   },
 
+  setRoomContext: (roomId, token, seat) =>
+    set({ gameId: roomId, playerToken: token, mySeat: seat }),
+  clearRoom: () =>
+    set({
+      room: null,
+      mySeat: null,
+      playerToken: null,
+      isPaused: false,
+      waitingFor: [],
+      terminated: false,
+      turnDeadline: null,
+      snapshot: null,
+    }),
+
   applyServerEvent: (ev) => {
     if (ev.type === "snapshot") {
       set({ snapshot: ev.snapshot });
@@ -84,9 +118,20 @@ export const useStore = create<State>((set, get) => ({
         botThinking: { player: null, since: 0 },
         selection: [],
         pendingTargets: null,
+        turnDeadline: null,
       }));
     } else if (ev.type === "bot_thinking") {
-      set({ botThinking: { player: ev.player, since: performance.now() } });
+      set({ botThinking: { player: ev.player, since: performance.now() }, turnDeadline: null });
+    } else if (ev.type === "human_thinking") {
+      set({ botThinking: { player: null, since: 0 }, turnDeadline: ev.deadline_ms });
+    } else if (ev.type === "room_state") {
+      set({ room: ev.room, mySeat: ev.my_seat });
+    } else if (ev.type === "paused") {
+      set({ isPaused: true, waitingFor: ev.waiting_for_seats });
+    } else if (ev.type === "resumed") {
+      set({ isPaused: false, waitingFor: [] });
+    } else if (ev.type === "terminated") {
+      set({ terminated: true, isPaused: false });
     } else if (ev.type === "game_over") {
       set((st) => ({
         snapshot: ev.snapshot,

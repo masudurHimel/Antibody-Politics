@@ -11,6 +11,19 @@ A digital implementation of the Spanish card game **Virus!** — 1 human vs 3 bo
 
 For dev with hot reload: `./run.sh dev` (open `:5173`).
 
+## Play with friends (ngrok)
+
+To host a multiplayer game accessible to friends over the internet:
+
+1. In one terminal: `./run.sh` (boots backend on `:8001`).
+2. In another: `./scripts/tunnel.sh` (forwards `:8001` through ngrok).
+3. Share the `https://*.ngrok-free.app/` URL ngrok prints.
+
+The host taps **MULTIPLAYER → CREATE**, copies the invite link from the
+lobby (`/join/<room-id>`), and shares it. Each friend opens the link, enters
+a name, taps **READY**. The host taps **START** once everyone is ready;
+empty seats are filled with bots.
+
 ## Docs
 
 - Design spec: [`docs/specs/spec.md`](docs/specs/spec.md)
