@@ -42,7 +42,7 @@ def legal_targets(state: GameState, player_idx: int, card: Card) -> list[dict[st
     if card.type == CardType.ORGAN:
         return _legal_organ_targets(state, player_idx, card)
     if card.type in (CardType.VIRUS, CardType.MEDICINE):
-        return _legal_attach_targets(state, card)
+        return _legal_attach_targets(state, player_idx, card)
     if card.type == CardType.TREATMENT:
         return _legal_treatment_targets(state, player_idx, card)
     raise IllegalAction(f"legal_targets not implemented for card type {card.type}")
@@ -98,9 +98,10 @@ def _apply_organ(state: GameState, player: Player, card: Card) -> list[str]:
 
 # ---- virus / medicine ----------------------------------------------------
 
-def _legal_attach_targets(state: GameState, card: Card) -> list[dict[str, Any]]:
+def _legal_attach_targets(state: GameState, player_idx: int, card: Card) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
-    for p in state.players:
+    candidates = [state.players[player_idx]] if card.type == CardType.MEDICINE else state.players
+    for p in candidates:
         for o in p.body:
             if o.status == OrganStatus.IMMUNIZED:
                 continue
@@ -114,6 +115,8 @@ def _apply_attach(state: GameState, source: Player, card: Card, targets: dict[st
     if "player" not in targets or "organ_id" not in targets:
         raise IllegalAction("attach card requires {player, organ_id}")
     target_player = state.players[targets["player"]]
+    if card.type == CardType.MEDICINE and target_player is not source:
+        raise IllegalAction("medicine can only be played on your own organs")
     organ = _find_organ(target_player, targets["organ_id"])
     if organ.status == OrganStatus.IMMUNIZED:
         raise IllegalAction("organ is immunized")

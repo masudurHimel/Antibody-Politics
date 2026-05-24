@@ -69,7 +69,10 @@ export default function Game() {
             return undefined;
         if (needsOrganTarget(singleCard)) {
             const all = {};
-            for (const p of snap.players)
+            const candidates = singleCard.type === "medicine"
+                ? snap.players.filter((p) => p.idx === viewerIdx)
+                : snap.players;
+            for (const p of candidates)
                 all[p.idx] = new Set(p.body.filter((o) => o.status !== "immunized").map((o) => o.id));
             return all;
         }

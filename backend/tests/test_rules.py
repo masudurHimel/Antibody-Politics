@@ -137,6 +137,26 @@ def test_play_medicine_on_infected_organ_cures_to_free():
     assert {"v1", "m-r-0"} <= discard_ids
 
 
+def test_play_medicine_on_opponent_is_illegal():
+    s = _empty_state()
+    opp_organ = Organ(id="o-r", color=Color.RED, attached=[])
+    s.players[1].body.append(opp_organ)
+    med = _card("m-r-0", CardType.MEDICINE, Color.RED)
+    s.players[0].hand.append(med)
+    with pytest.raises(IllegalAction):
+        apply_play(s, 0, med.id, {"player": 1, "organ_id": "o-r"})
+
+
+def test_legal_targets_for_medicine_excludes_opponent_organs():
+    from app.rules import legal_targets
+    s = _empty_state()
+    s.players[0].body.append(Organ(id="o-self", color=Color.RED, attached=[]))
+    s.players[1].body.append(Organ(id="o-opp", color=Color.RED, attached=[]))
+    med = _card("m-r-0", CardType.MEDICINE, Color.RED)
+    targets = legal_targets(s, 0, med)
+    assert targets == [{"player": 0, "organ_id": "o-self"}]
+
+
 def test_play_medicine_on_immunized_is_illegal():
     s = _empty_state()
     organ = Organ(id="o-r", color=Color.RED, attached=[
