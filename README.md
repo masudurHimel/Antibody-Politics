@@ -1,3 +1,13 @@
+---
+title: Antibody Politics
+emoji: 🧬
+colorFrom: green
+colorTo: blue
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # Antibody Politics
 
 A digital implementation of the Spanish card game **Virus!** — 1 human vs 3 bots, online multiplayer in Phase 2.
