@@ -16,19 +16,24 @@ permissions:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    # Pin to a specific commit SHA, not a moving tag, to prevent supply-chain risk.
     steps:
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
-          fetch-depth: 0
-          lfs: true
+          fetch-depth: 1
           persist-credentials: false
+
+      - name: Build deploy tree (strip non-runtime files)
+        run: |
+          set -euo pipefail
+          # Drop paths that aren't needed on the Space and/or contain binaries
+          # HF rejects without Xet/LFS. Keep this list in sync with .dockerignore.
+          rm -rf sources docs scripts venv backend/venv frontend/node_modules frontend/dist .git
 
       - name: Push to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_USER: ${{ vars.HF_USER }}
+          HF_USER:  ${{ vars.HF_USER }}
           HF_SPACE: antibody-politics
         run: |
           set -euo pipefail
@@ -40,11 +45,16 @@ jobs:
             echo "HF_USER repo variable is missing" >&2
             exit 1
           fi
+
+          git init -b main
           git config user.email "actions@github.com"
           git config user.name  "github-actions"
-          # Use an extraheader so the token never appears in the remote URL or logs.
+          git add -A
+          git commit -m "Deploy from GitHub ${GITHUB_SHA::7}"
+
+          # Authorization sent as a header so the token never appears in the URL or logs.
           AUTH=$(printf 'x-access-token:%s' "$HF_TOKEN" | base64 -w0)
           git -c http.extraheader="Authorization: Basic ${AUTH}" \
               push --force \
               "https://huggingface.co/spaces/${HF_USER}/${HF_SPACE}" \
-              HEAD:main
+              main:main
