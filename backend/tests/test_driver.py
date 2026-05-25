@@ -109,6 +109,44 @@ async def test_human_timeout_auto_discards():
     assert "human_thinking" in kinds
 
 
+async def test_human_turn_ms_none_disables_auto_discard():
+    """Solo driver (human_turn_ms=None) must wait indefinitely for the human;
+    no card may be auto-discarded while they are still deciding."""
+    gs, rs = InMemoryStore(), InMemoryRoomStore()
+    state, room = _seed_mixed(gs, rs)
+    bc = Broadcaster()
+    sock = FakeSocket()
+    bc.attach(seat=0, ws=sock)
+
+    from app import driver as dmod
+    saved = dmod.HUMAN_TURN_MS
+    dmod.HUMAN_TURN_MS = 50  # would auto-discard quickly if the override leaked
+    try:
+        driver = GameDriver(room_id="EFGH", game_id=state.game_id,
+                            game_store=gs, room_store=rs, broadcaster=bc,
+                            floor_ms=0, human_turn_ms=None)
+        original_hand = list(gs.get(state.game_id).players[0].hand)
+        task = asyncio.create_task(driver.run())
+        await asyncio.sleep(0.5)  # 10x the module timeout
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+    finally:
+        dmod.HUMAN_TURN_MS = saved
+
+    cur = gs.get(state.game_id)
+    assert cur.turn_idx == 0, "should still be the human's turn"
+    assert [c.id for c in cur.players[0].hand] == [c.id for c in original_hand], (
+        "no card should have been auto-discarded"
+    )
+    kinds = [m["type"] for m in sock.sent]
+    assert "human_thinking" in kinds
+    thinking = next(m for m in sock.sent if m["type"] == "human_thinking")
+    assert thinking["deadline_ms"] is None
+
+
 async def test_on_human_acted_short_circuits_timeout():
     gs, rs = InMemoryStore(), InMemoryRoomStore()
     state, room = _seed_mixed(gs, rs)

@@ -61,7 +61,7 @@ export interface RoomView {
 export type ServerEvent =
   | { type: "snapshot"; snapshot: Snapshot }
   | { type: "bot_thinking"; player: number; expected_ms: number }
-  | { type: "human_thinking"; player: number; deadline_ms: number }
+  | { type: "human_thinking"; player: number; deadline_ms: number | null }
   | { type: "action"; player: number; kind: "play" | "discard" | "pass"; events: string[]; snapshot: Snapshot }
   | { type: "game_over"; winner_idx: number; snapshot: Snapshot }
   | { type: "room_state"; my_seat: number; room: RoomView }

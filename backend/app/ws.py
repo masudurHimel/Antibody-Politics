@@ -76,6 +76,9 @@ def make_ws_router(
             game_store=store,
             room_store=InMemoryRoomStore(),
             broadcaster=bc,
+            # Solo: no other humans are waiting, so don't auto-discard a
+            # random card while the player is still deciding their move.
+            human_turn_ms=None,
         )
         driver.start()
 

@@ -14,8 +14,10 @@ from .rules import IllegalAction
 from .snapshot import public_snapshot
 from .store import GameStore
 
-HUMAN_TURN_MS = 10_000
+HUMAN_TURN_MS = 45_000
 BOT_FLOOR_MS = 1_000
+
+_USE_MODULE_DEFAULT: object = object()
 
 
 class GameDriver:
@@ -28,6 +30,7 @@ class GameDriver:
         room_store: RoomStore,
         broadcaster: Broadcaster,
         floor_ms: int = BOT_FLOOR_MS,
+        human_turn_ms: Optional[int] | object = _USE_MODULE_DEFAULT,
     ) -> None:
         self.room_id = room_id
         self.game_id = game_id
@@ -35,6 +38,10 @@ class GameDriver:
         self.room_store = room_store
         self.broadcaster = broadcaster
         self.floor_ms = floor_ms
+        # None disables the auto-discard timer (used for solo). The sentinel
+        # means "fall back to the module-level HUMAN_TURN_MS", so tests can
+        # monkey-patch the module global and still affect this driver.
+        self._human_turn_ms: Optional[int] | object = human_turn_ms
 
         self._wake = asyncio.Event()
         self._pause = asyncio.Event()
@@ -99,8 +106,38 @@ class GameDriver:
 
         await self._broadcast_action(state, seat, kind, events)
 
+    def _resolved_human_turn_ms(self) -> Optional[int]:
+        if self._human_turn_ms is _USE_MODULE_DEFAULT:
+            return HUMAN_TURN_MS
+        return self._human_turn_ms  # type: ignore[return-value]
+
     async def _run_human_turn(self, state: GameState, seat: int) -> None:
-        budget_ms = self._turn_remaining_ms or HUMAN_TURN_MS
+        limit_ms = self._resolved_human_turn_ms()
+
+        if limit_ms is None:
+            # No timeout: wait indefinitely for the human to act. Used in solo
+            # mode where there is no other player to keep waiting.
+            await self.broadcaster.broadcast(
+                "human_thinking", {"player": seat, "deadline_ms": None}
+            )
+            self._wake.clear()
+            self._current_wait = asyncio.create_task(self._wake.wait())
+            try:
+                await asyncio.shield(self._current_wait)
+            except asyncio.CancelledError:
+                # pause() clears self._pause then cancels the inner wait —
+                # in that case swallow so run()'s loop reprocesses on resume.
+                # Any other cancellation is the outer driver task being torn
+                # down; propagate it.
+                if self._pause.is_set():
+                    raise
+            finally:
+                if self._current_wait and not self._current_wait.done():
+                    self._current_wait.cancel()
+                self._current_wait = None
+            return
+
+        budget_ms = self._turn_remaining_ms or limit_ms
         deadline_ms = int(time.time() * 1000) + budget_ms
         await self.broadcaster.broadcast(
             "human_thinking", {"player": seat, "deadline_ms": deadline_ms}
