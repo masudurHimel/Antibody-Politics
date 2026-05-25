@@ -1,0 +1,50 @@
+name: Sync to Hugging Face Space
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+# Only allow one sync run at a time; cancel any in-flight run when a new one starts.
+concurrency:
+  group: hf-space-sync
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    # Pin to a specific commit SHA, not a moving tag, to prevent supply-chain risk.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          fetch-depth: 0
+          lfs: true
+          persist-credentials: false
+
+      - name: Push to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_USER: ${{ vars.HF_USER }}
+          HF_SPACE: antibody-politics
+        run: |
+          set -euo pipefail
+          if [ -z "${HF_TOKEN:-}" ]; then
+            echo "HF_TOKEN secret is missing" >&2
+            exit 1
+          fi
+          if [ -z "${HF_USER:-}" ]; then
+            echo "HF_USER repo variable is missing" >&2
+            exit 1
+          fi
+          git config user.email "actions@github.com"
+          git config user.name  "github-actions"
+          # Use an extraheader so the token never appears in the remote URL or logs.
+          AUTH=$(printf 'x-access-token:%s' "$HF_TOKEN" | base64 -w0)
+          git -c http.extraheader="Authorization: Basic ${AUTH}" \
+              push --force \
+              "https://huggingface.co/spaces/${HF_USER}/${HF_SPACE}" \
+              HEAD:main
