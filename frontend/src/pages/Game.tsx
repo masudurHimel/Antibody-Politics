@@ -67,6 +67,12 @@ export default function Game() {
     passTurn();
   }, [snap, human, myTurn, gameOver]);
 
+  // Drop any pending transplant source when the user changes/clears the active card.
+  useEffect(() => {
+    if (singleCard?.type === "treatment" && singleCard.treatment_kind === "transplant") return;
+    if (pendingFromOrgan) setPendingFromOrgan(null);
+  }, [singleCard, pendingFromOrgan]);
+
   const targetable = useMemo(() => {
     if (!snap || !singleCard) return undefined;
     if (needsOrganTarget(singleCard)) {
@@ -100,6 +106,10 @@ export default function Game() {
     if (singleCard.type === "treatment" && singleCard.treatment_kind === "transplant") {
       if (!pendingFromOrgan) {
         setPendingFromOrgan({ player: ownerIdx, organ_id: organ.id });
+        return;
+      }
+      if (pendingFromOrgan.player === ownerIdx && pendingFromOrgan.organ_id === organ.id) {
+        setPendingFromOrgan(null);
         return;
       }
       playCard(singleCard.id, { from: pendingFromOrgan, to: { player: ownerIdx, organ_id: organ.id } });
@@ -186,11 +196,27 @@ export default function Game() {
                   compact
                   onOrganClick={(o) => handleOrganClick(o, seat)}
                   targetableIds={targetable?.[seat]}
+                  pendingId={pendingFromOrgan?.player === seat ? pendingFromOrgan.organ_id : null}
                   selectablePlayer={selPlayerTargetable}
                   onSelectPlayer={() => handlePlayerClick(seat)}
                 />
               ))}
             </div>
+
+            {pendingFromOrgan && (
+              <div className="flex justify-center">
+                <div
+                  className="px-3 py-1 rounded-full font-chunky text-[10px] tracking-widest"
+                  style={{
+                    background: "var(--accent)",
+                    color: "var(--bg)",
+                    boxShadow: "0 0 14px rgba(245,196,58,0.55)",
+                  }}
+                >
+                  TAP DESTINATION ORGAN
+                </div>
+              </div>
+            )}
 
             {/* Deck / discard band */}
             <div className="flex justify-center">
@@ -220,6 +246,7 @@ export default function Game() {
               <OrganRow
                 organs={human.body}
                 targetableIds={targetable?.[viewerIdx]}
+                pendingId={pendingFromOrgan?.player === viewerIdx ? pendingFromOrgan.organ_id : null}
                 onOrganClick={(o) => handleOrganClick(o, viewerIdx)}
                 size="clamp(54px, 9vh, 78px)"
               />
@@ -289,6 +316,7 @@ export default function Game() {
                 align="center"
                 onOrganClick={(o) => handleOrganClick(o, seatTop)}
                 targetableIds={targetable?.[seatTop]}
+                pendingId={pendingFromOrgan?.player === seatTop ? pendingFromOrgan.organ_id : null}
                 selectablePlayer={selPlayerTargetable}
                 onSelectPlayer={() => handlePlayerClick(seatTop)}
               />
@@ -302,6 +330,7 @@ export default function Game() {
                   align="left"
                   onOrganClick={(o) => handleOrganClick(o, seatLeft)}
                   targetableIds={targetable?.[seatLeft]}
+                  pendingId={pendingFromOrgan?.player === seatLeft ? pendingFromOrgan.organ_id : null}
                   selectablePlayer={selPlayerTargetable}
                   onSelectPlayer={() => handlePlayerClick(seatLeft)}
                 />
@@ -333,6 +362,7 @@ export default function Game() {
                   align="right"
                   onOrganClick={(o) => handleOrganClick(o, seatRight)}
                   targetableIds={targetable?.[seatRight]}
+                  pendingId={pendingFromOrgan?.player === seatRight ? pendingFromOrgan.organ_id : null}
                   selectablePlayer={selPlayerTargetable}
                   onSelectPlayer={() => handlePlayerClick(seatRight)}
                 />
@@ -344,6 +374,7 @@ export default function Game() {
               <OrganRow
                 organs={human.body}
                 targetableIds={targetable?.[viewerIdx]}
+                pendingId={pendingFromOrgan?.player === viewerIdx ? pendingFromOrgan.organ_id : null}
                 onOrganClick={(o) => handleOrganClick(o, viewerIdx)}
                 size="clamp(72px, 11.5vh, 110px)"
               />

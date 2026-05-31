@@ -49,7 +49,7 @@ def check_winner(state: GameState) -> None:
     for p in state.players:
         if p.has_won():
             state.winner_idx = p.idx
-            state.event_log.append(f"P{p.idx} ({p.name}) won!")
+            state.event_log.append(f"{p.name} won!")
             return
 
 
@@ -82,7 +82,7 @@ def discard_cards(state: GameState, player_idx: int, card_ids: Sequence[str]) ->
         p.hand.remove(card)
         state.discard.append(card)
         moved.append(card.id)
-    state.event_log.append(f"P{player_idx} discarded {len(moved)} card(s)")
+    state.event_log.append(f"{p.name} discarded {len(moved)} card(s)")
     draw_to_three(state, player_idx)
     advance_turn(state)
     return [state.event_log[-1]]
@@ -95,7 +95,7 @@ def pass_turn(state: GameState, player_idx: int) -> list[str]:
         raise IllegalAction(f"not P{player_idx}'s turn")
     if state.players[player_idx].hand:
         raise IllegalAction("can only pass with empty hand")
-    state.event_log.append(f"P{player_idx} passed (empty hand)")
+    state.event_log.append(f"{state.players[player_idx].name} passed (empty hand)")
     draw_to_three(state, player_idx)
     advance_turn(state)
     return [state.event_log[-1]]

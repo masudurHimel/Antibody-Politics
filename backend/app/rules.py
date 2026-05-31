@@ -93,7 +93,7 @@ def _apply_organ(state: GameState, player: Player, card: Card) -> list[str]:
     _pop_card_from_hand(player, card.id)
     organ = Organ(id=f"organ-{uuid.uuid4().hex[:8]}", color=card.color, attached=[])
     player.body.append(organ)
-    return [f"P{player.idx} placed a {card.color.value} organ"]
+    return [f"{player.name} placed a {card.color.value} organ"]
 
 
 # ---- virus / medicine ----------------------------------------------------
@@ -133,7 +133,7 @@ def _apply_attach(state: GameState, source: Player, card: Card, targets: dict[st
             organ.attached.remove(med)
             state.discard.append(med)
             state.discard.append(card)
-            events.append(f"P{source.idx} virus stripped P{target_player.idx}'s {organ.color.value} vaccine")
+            events.append(f"{source.name} virus stripped {target_player.name}'s {organ.color.value} vaccine")
         elif organ.status == OrganStatus.INFECTED:
             # destroy organ — both viruses AND the organ card itself go to discard so the deck can recycle them
             for c in list(organ.attached):
@@ -141,10 +141,10 @@ def _apply_attach(state: GameState, source: Player, card: Card, targets: dict[st
             state.discard.append(card)
             state.discard.append(Card(id=f"organ-{uuid.uuid4().hex[:8]}", type=CardType.ORGAN, color=organ.color))
             target_player.body.remove(organ)
-            events.append(f"P{source.idx} destroyed P{target_player.idx}'s {organ.color.value} organ")
+            events.append(f"{source.name} destroyed {target_player.name}'s {organ.color.value} organ")
         else:  # FREE
             organ.attached.append(card)
-            events.append(f"P{source.idx} infected P{target_player.idx}'s {organ.color.value} organ")
+            events.append(f"{source.name} infected {target_player.name}'s {organ.color.value} organ")
     elif card.type == CardType.MEDICINE:
         if organ.status == OrganStatus.IMMUNIZED:
             raise IllegalAction("organ is already immunized")
@@ -153,13 +153,13 @@ def _apply_attach(state: GameState, source: Player, card: Card, targets: dict[st
             organ.attached.remove(virus)
             state.discard.append(virus)
             state.discard.append(card)
-            events.append(f"P{source.idx} cured P{target_player.idx}'s {organ.color.value} organ")
+            events.append(f"{source.name} cured {target_player.name}'s {organ.color.value} organ")
         else:  # FREE or VACCINATED → attach medicine
             organ.attached.append(card)
             if organ.status == OrganStatus.IMMUNIZED:
-                events.append(f"P{source.idx} immunized {'their' if target_player is source else f'P{target_player.idx}'} {organ.color.value} organ")
+                events.append(f"{source.name} immunized {'their' if target_player is source else target_player.name} {organ.color.value} organ")
             else:
-                events.append(f"P{source.idx} vaccinated {'their' if target_player is source else f'P{target_player.idx}'} {organ.color.value} organ")
+                events.append(f"{source.name} vaccinated {'their' if target_player is source else target_player.name} {organ.color.value} organ")
     else:
         raise IllegalAction(f"unexpected attach card type {card.type}")
     return events
@@ -239,7 +239,7 @@ def _apply_treatment(state: GameState, source: Player, card: Card, targets: dict
             state.discard.extend(p.hand)
             p.hand.clear()
         state.discard.append(card)
-        return [f"P{source.idx} played Latex Glove — all opponents discarded their hands"]
+        return [f"{source.name} played Latex Glove — all opponents discarded their hands"]
 
     if kind == TreatmentKind.ORGAN_THIEF:
         target = state.players[targets["player"]]
@@ -257,13 +257,13 @@ def _apply_treatment(state: GameState, source: Player, card: Card, targets: dict
         target.body.remove(organ)
         source.body.append(organ)
         state.discard.append(card)
-        return [f"P{source.idx} stole P{target.idx}'s {organ.color.value} organ"]
+        return [f"{source.name} stole {target.name}'s {organ.color.value} organ"]
 
     if kind == TreatmentKind.MEDICAL_ERROR:
         target = state.players[targets["player"]]
         source.body, target.body = target.body, source.body
         state.discard.append(card)
-        return [f"P{source.idx} swapped bodies with P{target.idx}"]
+        return [f"{source.name} swapped bodies with {target.name}"]
 
     if kind == TreatmentKind.TRANSPLANT:
         f, t_ = targets["from"], targets["to"]
@@ -282,7 +282,7 @@ def _apply_treatment(state: GameState, source: Player, card: Card, targets: dict
         a_player.body[a_idx] = b
         b_player.body[b_idx] = a
         state.discard.append(card)
-        return [f"P{source.idx} swapped P{a_player.idx}'s {a.color.value} with P{b_player.idx}'s {b.color.value}"]
+        return [f"{source.name} swapped {a_player.name}'s {a.color.value} with {b_player.name}'s {b.color.value}"]
 
     if kind == TreatmentKind.CONTAGION:
         events: list[str] = []
@@ -309,10 +309,10 @@ def _apply_treatment(state: GameState, source: Player, card: Card, targets: dict
                 tgt_player, tgt_organ = chosen
                 src_organ.attached.remove(virus)
                 tgt_organ.attached.append(virus)
-                events.append(f"P{source.idx} contagion infected P{tgt_player.idx}'s {tgt_organ.color.value} organ")
+                events.append(f"{source.name} contagion infected {tgt_player.name}'s {tgt_organ.color.value} organ")
         state.discard.append(card)
         if not events:
-            events.append(f"P{source.idx} played Contagion (no effect)")
+            events.append(f"{source.name} played Contagion (no effect)")
         return events
 
     raise IllegalAction(f"unknown treatment kind {kind}")

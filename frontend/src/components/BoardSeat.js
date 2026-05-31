@@ -5,7 +5,7 @@ import { OrganRow } from "./OrganRow";
 import { useStore } from "../game/store";
 import { seatPulse } from "../anim/variants";
 import { Avatar } from "./Avatar";
-export function BoardSeat({ player, align = "center", onOrganClick, targetableIds, selectablePlayer, onSelectPlayer, compact = false, }) {
+export function BoardSeat({ player, align = "center", onOrganClick, targetableIds, pendingId, selectablePlayer, onSelectPlayer, compact = false, }) {
     const thinkingPlayer = useStore((s) => s.botThinking.player);
     const isThinking = thinkingPlayer === player.idx;
     const turnIdx = useStore((s) => s.snapshot?.turn_idx);
@@ -13,7 +13,7 @@ export function BoardSeat({ player, align = "center", onOrganClick, targetableId
     const isActive = turnIdx === player.idx;
     const avatarSeed = `${gameId}:${player.idx}`;
     if (compact) {
-        return (_jsxs(motion.div, { variants: seatPulse, animate: isActive ? "active" : "idle", className: `flex flex-col items-center gap-1 rounded-xl px-1 py-1 flex-1 min-w-0 overflow-hidden ${isActive ? "ring-2 ring-accent shadow-[0_0_18px_rgba(245,196,58,0.35)]" : ""} ${selectablePlayer ? "cursor-pointer hover:ring-2 hover:ring-accent2" : ""}`, style: {
+        return (_jsxs(motion.div, { variants: seatPulse, animate: isActive ? "active" : "idle", className: `flex flex-col items-center gap-1 rounded-xl px-1 py-1 flex-1 min-w-0 ${isActive ? "ring-2 ring-accent shadow-[0_0_18px_rgba(245,196,58,0.35)]" : ""} ${selectablePlayer ? "cursor-pointer hover:ring-2 hover:ring-accent2" : ""}`, style: {
                 background: "rgba(0,0,0,0.22)",
                 backdropFilter: "blur(2px)",
                 border: "1px solid rgba(255,255,255,0.06)",
@@ -33,7 +33,7 @@ export function BoardSeat({ player, align = "center", onOrganClick, targetableId
                                 background: "var(--accent)",
                                 color: "var(--bg)",
                                 boxShadow: "0 1px 3px rgba(0,0,0,0.6)",
-                            }, "aria-label": `${player.hand_count} cards in hand`, children: player.hand_count })] }), _jsx("div", { className: "font-display font-semibold truncate w-full text-center", style: { fontSize: 10, maxWidth: "10ch", lineHeight: 1.1 }, children: player.name }), isThinking && (_jsx(motion.div, { animate: { opacity: [0.3, 1, 0.3] }, transition: { repeat: Infinity, duration: 1.2 }, className: "text-muted", style: { fontSize: 8, lineHeight: 1, marginTop: -2 }, children: "thinking\u2026" })), _jsx("div", { className: "w-full flex justify-center overflow-hidden", children: _jsx(OrganRow, { organs: player.body, size: "clamp(22px, 4.6vh, 32px)", onOrganClick: onOrganClick, targetableIds: targetableIds, gap: 3 }) })] }));
+                            }, "aria-label": `${player.hand_count} cards in hand`, children: player.hand_count })] }), _jsx("div", { className: "font-display font-semibold truncate w-full text-center", style: { fontSize: 10, maxWidth: "10ch", lineHeight: 1.1 }, children: player.name }), isThinking && (_jsx(motion.div, { animate: { opacity: [0.3, 1, 0.3] }, transition: { repeat: Infinity, duration: 1.2 }, className: "text-muted", style: { fontSize: 8, lineHeight: 1, marginTop: -2 }, children: "thinking\u2026" })), _jsx("div", { className: "w-full flex justify-center", children: _jsx(OrganRow, { organs: player.body, size: "clamp(26px, 5.2vh, 36px)", onOrganClick: onOrganClick, targetableIds: targetableIds, pendingId: pendingId, gap: 4, compact: true }) })] }));
     }
     const organSize = "clamp(50px, 8.5vh, 80px)";
     const handBackH = "clamp(42px, 7.5vh, 72px)";
@@ -56,5 +56,5 @@ export function BoardSeat({ player, align = "center", onOrganClick, targetableId
                                     marginLeft: i === 0 ? 0 : `calc(${handBackH} / -3)`,
                                     transformOrigin: "bottom center",
                                 }, children: _jsx(CardBack, { h: handBackH }) }, i));
-                        }) })] }), _jsx("div", { className: `w-full flex ${align === "left" ? "justify-start" : align === "right" ? "justify-end" : "justify-center"}`, children: _jsx(OrganRow, { organs: player.body, size: organSize, onOrganClick: onOrganClick, targetableIds: targetableIds }) })] }));
+                        }) })] }), _jsx("div", { className: `w-full flex ${align === "left" ? "justify-start" : align === "right" ? "justify-end" : "justify-center"}`, children: _jsx(OrganRow, { organs: player.body, size: organSize, onOrganClick: onOrganClick, targetableIds: targetableIds, pendingId: pendingId }) })] }));
 }

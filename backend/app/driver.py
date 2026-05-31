@@ -193,7 +193,7 @@ class GameDriver:
         rng = random.Random(state.seed + state.turn_idx * 101 + len(state.event_log))
         chosen = rng.choice(hand)
         events = discard_cards(state, seat, [chosen.id])
-        return "discard", [f"P{seat} timed out — auto-discarded"] + events
+        return "discard", [f"{state.players[seat].name} timed out — auto-discarded"] + events
 
     async def _broadcast_action(
         self, state: GameState, seat: int, kind: str, events: list[str]

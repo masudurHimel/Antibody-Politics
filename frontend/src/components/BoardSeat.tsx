@@ -11,6 +11,7 @@ export function BoardSeat({
   align = "center",
   onOrganClick,
   targetableIds,
+  pendingId,
   selectablePlayer,
   onSelectPlayer,
   compact = false,
@@ -19,6 +20,7 @@ export function BoardSeat({
   align?: "left" | "center" | "right";
   onOrganClick?: (organ: Organ) => void;
   targetableIds?: Set<string>;
+  pendingId?: string | null;
   selectablePlayer?: boolean;
   onSelectPlayer?: () => void;
   compact?: boolean;
@@ -35,7 +37,7 @@ export function BoardSeat({
       <motion.div
         variants={seatPulse}
         animate={isActive ? "active" : "idle"}
-        className={`flex flex-col items-center gap-1 rounded-xl px-1 py-1 flex-1 min-w-0 overflow-hidden ${
+        className={`flex flex-col items-center gap-1 rounded-xl px-1 py-1 flex-1 min-w-0 ${
           isActive ? "ring-2 ring-accent shadow-[0_0_18px_rgba(245,196,58,0.35)]" : ""
         } ${selectablePlayer ? "cursor-pointer hover:ring-2 hover:ring-accent2" : ""}`}
         style={{
@@ -102,13 +104,15 @@ export function BoardSeat({
         )}
 
         {/* compact organ row */}
-        <div className="w-full flex justify-center overflow-hidden">
+        <div className="w-full flex justify-center">
           <OrganRow
             organs={player.body}
-            size="clamp(22px, 4.6vh, 32px)"
+            size="clamp(26px, 5.2vh, 36px)"
             onOrganClick={onOrganClick}
             targetableIds={targetableIds}
-            gap={3}
+            pendingId={pendingId}
+            gap={4}
+            compact
           />
         </div>
       </motion.div>
@@ -187,6 +191,7 @@ export function BoardSeat({
           size={organSize}
           onOrganClick={onOrganClick}
           targetableIds={targetableIds}
+          pendingId={pendingId}
         />
       </div>
     </motion.div>
