@@ -81,6 +81,7 @@ export function OrganRow({
             style={{
               height: size,
               borderRadius: 12,
+              touchAction: "manipulation",
               boxShadow: isPending
                 ? "0 0 0 3px var(--accent), 0 0 18px rgba(245,196,58,0.85)"
                 : undefined,

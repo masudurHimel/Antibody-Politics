@@ -37,6 +37,7 @@ export function BoardSeat({
       <motion.div
         variants={seatPulse}
         animate={isActive ? "active" : "idle"}
+        onClick={selectablePlayer ? onSelectPlayer : undefined}
         className={`flex flex-col items-center gap-1 rounded-xl px-1 py-1 flex-1 min-w-0 ${
           isActive ? "ring-2 ring-accent shadow-[0_0_18px_rgba(245,196,58,0.35)]" : ""
         } ${selectablePlayer ? "cursor-pointer hover:ring-2 hover:ring-accent2" : ""}`}
@@ -44,12 +45,12 @@ export function BoardSeat({
           background: "rgba(0,0,0,0.22)",
           backdropFilter: "blur(2px)",
           border: "1px solid rgba(255,255,255,0.06)",
+          touchAction: "manipulation",
         }}
       >
         {/* avatar with hand-count badge */}
         <div
           className="relative"
-          onClick={selectablePlayer ? onSelectPlayer : undefined}
           style={{ width: 36, height: 36, minWidth: 36, minHeight: 36 }}
         >
           <div
