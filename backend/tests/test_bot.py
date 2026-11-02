@@ -92,3 +92,41 @@ def test_hybrid_outperforms_heuristic_only_over_50_games():
         return
     rate = hybrid_wins / total_decided
     assert rate >= 0.50, f"hybrid win rate {rate:.2f} too low ({hybrid_wins}/{total_decided})"
+
+
+def _med_only_state(target_infected: bool):
+    """Seat 0 holds only a red medicine; the only red organ belongs to seat 1."""
+    from app.models import Card, CardType, Color, Organ
+
+    state = start_game(game_id="g", seed=11, names=["A", "B", "C", "D"], bots=[True]*4)
+    for p in state.players:
+        p.body = []
+    state.turn_idx = 0
+    state.players[0].hand = [Card(id="med", type=CardType.MEDICINE, color=Color.RED)]
+    organ = Organ(id="o1", color=Color.RED)
+    if target_infected:
+        organ.attached.append(Card(id="vir", type=CardType.VIRUS, color=Color.RED))
+    state.players[1].body = [organ]
+    return state
+
+
+def test_bot_never_heals_an_opponent():
+    for infected in (False, True):
+        state = _med_only_state(infected)
+        kind, payload = choose_action(_snap_for(state, 0), 0)
+        assert (kind, payload) == ("discard", {"card_ids": ["med"]})
+
+
+def test_bot_skips_transplant_between_two_opponents():
+    from app.models import Card, CardType, Color, Organ, TreatmentKind
+
+    state = start_game(game_id="g", seed=11, names=["A", "B", "C", "D"], bots=[True]*4)
+    for p in state.players:
+        p.body = []
+    state.turn_idx = 0
+    state.players[0].hand = [Card(id="tp", type=CardType.TREATMENT, color=Color.MULTI,
+                                  treatment_kind=TreatmentKind.TRANSPLANT)]
+    state.players[1].body = [Organ(id="o1", color=Color.RED)]
+    state.players[2].body = [Organ(id="o2", color=Color.BLUE)]
+    kind, _ = choose_action(_snap_for(state, 0), 0)
+    assert kind == "discard"

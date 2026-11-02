@@ -16,6 +16,7 @@ from .store import GameStore
 
 HUMAN_TURN_MS = 45_000
 BOT_FLOOR_MS = 1_000
+PACE_MIN, PACE_MAX = 0.3, 2.5
 
 _USE_MODULE_DEFAULT: object = object()
 
@@ -37,6 +38,7 @@ class GameDriver:
         self.game_store = game_store
         self.room_store = room_store
         self.broadcaster = broadcaster
+        self._base_floor_ms = floor_ms
         self.floor_ms = floor_ms
         # None disables the auto-discard timer (used for solo). The sentinel
         # means "fall back to the module-level HUMAN_TURN_MS", so tests can
@@ -61,6 +63,11 @@ class GameDriver:
                 await self._task
             except (asyncio.CancelledError, Exception):
                 pass
+
+    def set_pace(self, factor: float) -> None:
+        """Scale the bot thinking floor (solo only): 0.45 fast, 1 normal, 1.7 relaxed."""
+        factor = min(max(float(factor), PACE_MIN), PACE_MAX)
+        self.floor_ms = round(self._base_floor_ms * factor)
 
     def on_human_acted(self) -> None:
         self._wake.set()
@@ -160,9 +167,11 @@ class GameDriver:
             elapsed_ms = (time.monotonic() - started) * 1000
             if not self._pause.is_set():
                 self._turn_remaining_ms = max(0, budget_ms - int(elapsed_ms))
-            else:
-                self._turn_remaining_ms = None
-            return
+                return
+            # Not a pause: the outer driver task is being cancelled — propagate,
+            # same as the untimed branch above.
+            self._turn_remaining_ms = None
+            raise
         finally:
             if self._current_wait and not self._current_wait.done():
                 self._current_wait.cancel()

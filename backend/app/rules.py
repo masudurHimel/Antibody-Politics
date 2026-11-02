@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 from typing import Any
 
 from .models import (
@@ -32,8 +31,37 @@ def _body_colors(player: Player) -> set[Color]:
     return {o.color for o in player.body}
 
 
+_ORGAN_NAME = {Color.RED: "Heart", Color.GREEN: "Stomach", Color.BLUE: "Brain", Color.YELLOW: "Bone", Color.MULTI: "Wild organ"}
+
+
+def _organ_name(color: Color) -> str:
+    return _ORGAN_NAME[color]
+
+
+def _whose(target: Player, actor: Player) -> str:
+    """Possessive for activity-log lines; the solo human is named "You"."""
+    if target is actor:
+        return "your" if actor.name == "You" else "their own"
+    return "your" if target.name == "You" else f"{target.name}'s"
+
+
 def _organ_color_matches(card_color: Color, organ_color: Color) -> bool:
     return card_color == Color.MULTI or organ_color == Color.MULTI or card_color == organ_color
+
+
+def _attach_color_ok(card: Card, organ: Organ) -> bool:
+    """Official FAQ: a virus neutralizing a vaccine must also match the medicine's
+    color; a medicine curing an infection must also match the virus's color."""
+    if not _organ_color_matches(card.color, organ.color):
+        return False
+    if card.type == CardType.VIRUS and organ.status == OrganStatus.VACCINATED:
+        opposing = CardType.MEDICINE
+    elif card.type == CardType.MEDICINE and organ.status == OrganStatus.INFECTED:
+        opposing = CardType.VIRUS
+    else:
+        return True
+    other = next(c for c in organ.attached if c.type == opposing)
+    return _organ_color_matches(card.color, other.color)
 
 
 # ---- public API -----------------------------------------------------------
@@ -76,8 +104,6 @@ def _legal_organ_targets(state: GameState, player_idx: int, card: Card) -> list[
         return []
     if card.color == Color.MULTI and Color.MULTI in body_colors:
         return []
-    if len(state.players[player_idx].body) >= 4:
-        return []
     return [{}]
 
 
@@ -87,25 +113,23 @@ def _apply_organ(state: GameState, player: Player, card: Card) -> list[str]:
         raise IllegalAction(f"P{player.idx} already has a {card.color.value} organ")
     if card.color == Color.MULTI and Color.MULTI in body_colors:
         raise IllegalAction(f"P{player.idx} already has a multi organ")
-    if len(player.body) >= 4:
-        raise IllegalAction("body already has 4 organs")
 
     _pop_card_from_hand(player, card.id)
-    organ = Organ(id=f"organ-{uuid.uuid4().hex[:8]}", color=card.color, attached=[])
+    # The organ keeps the played card's id so one physical card has one id hand → body → discard.
+    organ = Organ(id=card.id, color=card.color, attached=[])
     player.body.append(organ)
-    return [f"{player.name} placed a {card.color.value} organ"]
+    return [f"{player.name} placed a {_organ_name(card.color)}"]
 
 
 # ---- virus / medicine ----------------------------------------------------
 
 def _legal_attach_targets(state: GameState, player_idx: int, card: Card) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
-    candidates = [state.players[player_idx]] if card.type == CardType.MEDICINE else state.players
-    for p in candidates:
+    for p in state.players:
         for o in p.body:
             if o.status == OrganStatus.IMMUNIZED:
                 continue
-            if not _organ_color_matches(card.color, o.color):
+            if not _attach_color_ok(card, o):
                 continue
             out.append({"player": p.idx, "organ_id": o.id})
     return out
@@ -115,12 +139,10 @@ def _apply_attach(state: GameState, source: Player, card: Card, targets: dict[st
     if "player" not in targets or "organ_id" not in targets:
         raise IllegalAction("attach card requires {player, organ_id}")
     target_player = state.players[targets["player"]]
-    if card.type == CardType.MEDICINE and target_player is not source:
-        raise IllegalAction("medicine can only be played on your own organs")
     organ = _find_organ(target_player, targets["organ_id"])
     if organ.status == OrganStatus.IMMUNIZED:
         raise IllegalAction("organ is immunized")
-    if not _organ_color_matches(card.color, organ.color):
+    if not _attach_color_ok(card, organ):
         raise IllegalAction("color mismatch")
 
     _pop_card_from_hand(source, card.id)
@@ -133,18 +155,18 @@ def _apply_attach(state: GameState, source: Player, card: Card, targets: dict[st
             organ.attached.remove(med)
             state.discard.append(med)
             state.discard.append(card)
-            events.append(f"{source.name} virus stripped {target_player.name}'s {organ.color.value} vaccine")
+            events.append(f"{source.name} broke the vaccine on {_whose(target_player, source)} {_organ_name(organ.color)}")
         elif organ.status == OrganStatus.INFECTED:
             # destroy organ — both viruses AND the organ card itself go to discard so the deck can recycle them
             for c in list(organ.attached):
                 state.discard.append(c)
             state.discard.append(card)
-            state.discard.append(Card(id=f"organ-{uuid.uuid4().hex[:8]}", type=CardType.ORGAN, color=organ.color))
+            state.discard.append(Card(id=organ.id, type=CardType.ORGAN, color=organ.color))
             target_player.body.remove(organ)
-            events.append(f"{source.name} destroyed {target_player.name}'s {organ.color.value} organ")
+            events.append(f"{source.name} destroyed {_whose(target_player, source)} {_organ_name(organ.color)}")
         else:  # FREE
             organ.attached.append(card)
-            events.append(f"{source.name} infected {target_player.name}'s {organ.color.value} organ")
+            events.append(f"{source.name} infected {_whose(target_player, source)} {_organ_name(organ.color)}")
     elif card.type == CardType.MEDICINE:
         if organ.status == OrganStatus.IMMUNIZED:
             raise IllegalAction("organ is already immunized")
@@ -153,13 +175,13 @@ def _apply_attach(state: GameState, source: Player, card: Card, targets: dict[st
             organ.attached.remove(virus)
             state.discard.append(virus)
             state.discard.append(card)
-            events.append(f"{source.name} cured {target_player.name}'s {organ.color.value} organ")
+            events.append(f"{source.name} cured {_whose(target_player, source)} {_organ_name(organ.color)}")
         else:  # FREE or VACCINATED → attach medicine
             organ.attached.append(card)
             if organ.status == OrganStatus.IMMUNIZED:
-                events.append(f"{source.name} immunized {'their' if target_player is source else target_player.name} {organ.color.value} organ")
+                events.append(f"{source.name} immunized {_whose(target_player, source)} {_organ_name(organ.color)}")
             else:
-                events.append(f"{source.name} vaccinated {'their' if target_player is source else target_player.name} {organ.color.value} organ")
+                events.append(f"{source.name} vaccinated {_whose(target_player, source)} {_organ_name(organ.color)}")
     else:
         raise IllegalAction(f"unexpected attach card type {card.type}")
     return events
@@ -184,8 +206,6 @@ def _legal_treatment_targets(state: GameState, player_idx: int, card: Card) -> l
                 if o.color != Color.MULTI and o.color in thief_colors:
                     continue
                 if o.color == Color.MULTI and Color.MULTI in thief_colors:
-                    continue
-                if len(state.players[player_idx].body) >= 4:
                     continue
                 out.append({"player": p.idx, "organ_id": o.id})
         return out
@@ -239,7 +259,7 @@ def _apply_treatment(state: GameState, source: Player, card: Card, targets: dict
             state.discard.extend(p.hand)
             p.hand.clear()
         state.discard.append(card)
-        return [f"{source.name} played Latex Glove — all opponents discarded their hands"]
+        return [f"{source.name} snapped a Latex Glove. Everyone else drops their hand"]
 
     if kind == TreatmentKind.ORGAN_THIEF:
         target = state.players[targets["player"]]
@@ -247,9 +267,6 @@ def _apply_treatment(state: GameState, source: Player, card: Card, targets: dict
         if organ.status == OrganStatus.IMMUNIZED:
             source.hand.append(card)
             raise IllegalAction("cannot steal immunized")
-        if len(source.body) >= 4:
-            source.hand.append(card)
-            raise IllegalAction("body full")
         thief_colors = _body_colors(source)
         if (organ.color != Color.MULTI and organ.color in thief_colors) or (organ.color == Color.MULTI and Color.MULTI in thief_colors):
             source.hand.append(card)
@@ -257,13 +274,13 @@ def _apply_treatment(state: GameState, source: Player, card: Card, targets: dict
         target.body.remove(organ)
         source.body.append(organ)
         state.discard.append(card)
-        return [f"{source.name} stole {target.name}'s {organ.color.value} organ"]
+        return [f"{source.name} stole {_whose(target, source)} {_organ_name(organ.color)}"]
 
     if kind == TreatmentKind.MEDICAL_ERROR:
         target = state.players[targets["player"]]
         source.body, target.body = target.body, source.body
         state.discard.append(card)
-        return [f"{source.name} swapped bodies with {target.name}"]
+        return [f"{source.name} swapped bodies with {'you' if target.name == 'You' else target.name}"]
 
     if kind == TreatmentKind.TRANSPLANT:
         f, t_ = targets["from"], targets["to"]
@@ -282,7 +299,7 @@ def _apply_treatment(state: GameState, source: Player, card: Card, targets: dict
         a_player.body[a_idx] = b
         b_player.body[b_idx] = a
         state.discard.append(card)
-        return [f"{source.name} swapped {a_player.name}'s {a.color.value} with {b_player.name}'s {b.color.value}"]
+        return [f"{source.name} swapped {_whose(a_player, source)} {_organ_name(a.color)} with {_whose(b_player, source)} {_organ_name(b.color)}"]
 
     if kind == TreatmentKind.CONTAGION:
         events: list[str] = []
@@ -309,10 +326,10 @@ def _apply_treatment(state: GameState, source: Player, card: Card, targets: dict
                 tgt_player, tgt_organ = chosen
                 src_organ.attached.remove(virus)
                 tgt_organ.attached.append(virus)
-                events.append(f"{source.name} contagion infected {tgt_player.name}'s {tgt_organ.color.value} organ")
+                events.append(f"{source.name} spread a virus to {_whose(tgt_player, source)} {_organ_name(tgt_organ.color)}")
         state.discard.append(card)
         if not events:
-            events.append(f"{source.name} played Contagion (no effect)")
+            events.append(f"{source.name} played Contagion, but no virus could move")
         return events
 
     raise IllegalAction(f"unknown treatment kind {kind}")

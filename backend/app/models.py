@@ -66,15 +66,18 @@ class Organ(BaseModel):
 
 
 def _has_distinct_winning_set(colors: list[Color]) -> bool:
-    """4 colors, distinct, MULTI fills any missing color."""
-    if len(colors) != 4:
+    """4 healthy organs of distinct colors, MULTI fills any missing color.
+
+    A body may hold 5 organs (4 colors + multi); any 4 distinct healthy ones win.
+    """
+    if len(colors) < 4:
         return False
     plain = [c for c in colors if c != Color.MULTI]
     multis = len(colors) - len(plain)
     if len(set(plain)) != len(plain):
         return False
     if multis == 0:
-        return len(set(plain)) == 4
+        return len(set(plain)) >= 4
     needed = 4 - len(plain)
     return multis >= needed
 

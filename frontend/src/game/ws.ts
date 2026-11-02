@@ -17,9 +17,18 @@ export function connectRoomWs(roomId: string, token: string): WebSocket {
   return ws;
 }
 
+// Sockets closed on purpose (leaving a game) must not auto-reconnect.
+const closedOnPurpose = new WeakSet<WebSocket>();
+
+export function closeWs(ws: WebSocket) {
+  closedOnPurpose.add(ws);
+  ws.close();
+}
+
 function wireWs(ws: WebSocket, reconnect: () => void, idForAttach: string) {
   let pinger: number | null = null;
   ws.onmessage = (e) => {
+    if (closedOnPurpose.has(ws)) return;
     const ev = JSON.parse(e.data) as ServerEvent;
     useStore.getState().applyServerEvent(ev);
   };
@@ -33,12 +42,15 @@ function wireWs(ws: WebSocket, reconnect: () => void, idForAttach: string) {
   };
   ws.onclose = () => {
     if (pinger) window.clearInterval(pinger);
+    if (closedOnPurpose.has(ws)) return;
     const st = useStore.getState();
     const snap = st.snapshot;
     const terminated = st.terminated;
     if (terminated) return;
     if (!snap || snap.winner_idx == null) {
-      setTimeout(reconnect, 1000);
+      setTimeout(() => {
+        if (!closedOnPurpose.has(ws)) reconnect();
+      }, 1000);
     }
   };
 }

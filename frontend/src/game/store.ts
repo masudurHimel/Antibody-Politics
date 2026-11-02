@@ -1,5 +1,14 @@
 import { create } from "zustand";
 import type { ClientMessage, RoomView, ServerEvent, Snapshot } from "./types";
+import type { LastAction, OrganRef } from "../three/contract";
+
+/** Solo game pace → animation/bot-timing multiplier. */
+export const PACES = { relaxed: 1.7, normal: 1, fast: 0.45 } as const;
+
+function savedPace(): number {
+  const v = Number(localStorage.getItem("animSpeed"));
+  return (Object.values(PACES) as number[]).includes(v) ? v : PACES.normal;
+}
 
 type ConnStatus = "idle" | "connecting" | "open" | "closed";
 
@@ -10,11 +19,15 @@ interface State {
   events: string[];
   /** Up to 3 selected hand cards. 1-card selection can be played; 1-3 can be discarded. */
   selection: string[];
-  pendingTargets: Record<string, unknown> | null;
+  /** Transplant: first organ picked, waiting for its swap partner */
+  pendingOrgan: OrganRef | null;
   theme: "light" | "dark";
   animSpeed: number;
-  soundOn: boolean;
   botThinking: { player: number | null; since: number };
+  /** last server `action`; `seq` increments every time so the scene can tell repeats apart */
+  lastAction: LastAction | null;
+  /** client-side turn counter for the side panel (resets when a new game id arrives) */
+  turnNo: number;
   toast: string | null;
 
   // Multiplayer
@@ -30,7 +43,8 @@ interface State {
   pushEvents: (e: string[]) => void;
   toggleSelect: (id: string) => void;
   clearSelection: () => void;
-  setPendingTargets: (t: Record<string, unknown> | null) => void;
+  setPendingOrgan: (r: OrganRef | null) => void;
+  setPace: (factor: number) => void;
   setTheme: (t: "light" | "dark") => void;
   setBotThinking: (p: number | null) => void;
   setToast: (m: string | null) => void;
@@ -40,6 +54,8 @@ interface State {
 
   setRoomContext: (roomId: string, token: string, seat: number) => void;
   clearRoom: () => void;
+  /** Forget the current game and room (the caller closes the socket). */
+  resetGame: () => void;
 }
 
 const initialTheme: "light" | "dark" =
@@ -55,11 +71,12 @@ export const useStore = create<State>((set, get) => ({
   gameId: null,
   events: [],
   selection: [],
-  pendingTargets: null,
+  pendingOrgan: null,
   theme: initialTheme,
-  animSpeed: Number(localStorage.getItem("animSpeed") ?? "1"),
-  soundOn: localStorage.getItem("soundOn") !== "0",
+  animSpeed: savedPace(),
   botThinking: { player: null, since: 0 },
+  lastAction: null,
+  turnNo: 1,
   toast: null,
 
   room: null,
@@ -70,16 +87,21 @@ export const useStore = create<State>((set, get) => ({
   waitingFor: [],
   terminated: false,
 
-  setSnapshot: (s) => set({ snapshot: s }),
+  setSnapshot: (s) => set((st) => ({ snapshot: s, turnNo: st.snapshot?.game_id === s.game_id ? st.turnNo : 1 })),
   pushEvents: (e) => set((st) => ({ events: [...st.events, ...e].slice(-40) })),
   toggleSelect: (id) =>
     set((st) => {
-      if (st.selection.includes(id)) return { selection: st.selection.filter((x) => x !== id) };
+      if (st.selection.includes(id)) return { selection: st.selection.filter((x) => x !== id), pendingOrgan: null };
       if (st.selection.length >= 3) return st;
-      return { selection: [...st.selection, id] };
+      return { selection: [...st.selection, id], pendingOrgan: null };
     }),
-  clearSelection: () => set({ selection: [], pendingTargets: null }),
-  setPendingTargets: (t) => set({ pendingTargets: t }),
+  clearSelection: () => set({ selection: [], pendingOrgan: null }),
+  setPendingOrgan: (r) => set({ pendingOrgan: r }),
+  setPace: (factor) => {
+    localStorage.setItem("animSpeed", String(factor));
+    set({ animSpeed: factor });
+    get().send({ type: "set_pace", factor });
+  },
   setTheme: (t) => {
     document.documentElement.setAttribute("data-theme", t);
     localStorage.setItem("theme", t);
@@ -107,18 +129,40 @@ export const useStore = create<State>((set, get) => ({
       turnDeadline: null,
       snapshot: null,
     }),
+  resetGame: () =>
+    set({
+      conn: { status: "idle", ws: null },
+      snapshot: null,
+      gameId: null,
+      events: [],
+      selection: [],
+      pendingOrgan: null,
+      botThinking: { player: null, since: 0 },
+      lastAction: null,
+      turnNo: 1,
+      toast: null,
+      room: null,
+      mySeat: null,
+      playerToken: null,
+      turnDeadline: null,
+      isPaused: false,
+      waitingFor: [],
+      terminated: false,
+    }),
 
   applyServerEvent: (ev) => {
     if (ev.type === "snapshot") {
-      set({ snapshot: ev.snapshot });
+      get().setSnapshot(ev.snapshot);
     } else if (ev.type === "action") {
       set((st) => ({
         snapshot: ev.snapshot,
         events: [...st.events, ...ev.events].slice(-40),
         botThinking: { player: null, since: 0 },
         selection: [],
-        pendingTargets: null,
+        pendingOrgan: null,
         turnDeadline: null,
+        lastAction: { player: ev.player, kind: ev.kind, seq: (st.lastAction?.seq ?? 0) + 1 },
+        turnNo: st.turnNo + 1,
       }));
     } else if (ev.type === "bot_thinking") {
       set({ botThinking: { player: ev.player, since: performance.now() }, turnDeadline: null });

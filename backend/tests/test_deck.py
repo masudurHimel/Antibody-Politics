@@ -1,4 +1,3 @@
-import random
 from collections import Counter
 
 from app.deck import build_deck, draw_one
@@ -64,11 +63,19 @@ def test_card_ids_are_unique():
     assert len(set(ids)) == len(ids)
 
 
-def test_draw_one_reshuffles_discard_when_deck_empty():
+def test_draw_one_flips_discard_when_deck_empty():
+    # Rulebook: the discard pile is flipped to form the new deck — no reshuffle.
     deck = []
     discard = build_deck()
-    rng = random.Random(7)
-    card = draw_one(deck, discard, rng)
+    bottom_id = discard[0].id
+    expected = list(reversed(discard))  # bottom of the discard pile becomes the deck's top
+    card = draw_one(deck, discard)
     assert card is not None
+    assert card.id == bottom_id
     assert len(discard) == 0
-    assert len(deck) == 67  # 68 reshuffled, 1 drawn
+    assert len(deck) == 67  # 68 flipped, 1 drawn
+    assert deck == expected[:-1]
+
+
+def test_draw_one_returns_none_when_deck_and_discard_empty():
+    assert draw_one([], []) is None

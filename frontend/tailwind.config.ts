@@ -20,8 +20,8 @@ export default {
         yellow: { game: "var(--c-yellow)", deep: "var(--c-yellow-d)" },
       },
       fontFamily: {
-        display: ["Inter", "system-ui", "sans-serif"],
-        chunky: ["'Bungee'", "Inter", "system-ui", "sans-serif"],
+        display: ["'Atkinson Hyperlegible'", "system-ui", "sans-serif"],
+        chunky: ["'Bowlby One'", "'Arial Black'", "system-ui", "sans-serif"],
       },
       boxShadow: {
         card: "0 10px 30px -8px rgba(0,0,0,0.55)",

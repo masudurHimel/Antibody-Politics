@@ -1,7 +1,9 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useState, type FormEvent } from "react";
 import { joinRoom, storeToken } from "../game/room";
+import { CardFan, PregameHeader } from "./pregameUi";
+import { NAME_MAX } from "./pregame";
 
+/** Landing page for an invite link (/join/<CODE>). */
 export default function JoinRoom({
   roomId,
   onJoined,
@@ -11,77 +13,74 @@ export default function JoinRoom({
   onJoined: (roomId: string, token: string, seat: number) => void;
   onCancel: () => void;
 }) {
-  const [name, setName] = useState(localStorage.getItem("mp:lastName") ?? "");
+  const [name, setName] = useState(() => localStorage.getItem("mp:lastName") ?? "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  async function submit() {
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    const n = name.trim();
+    if (!n) {
+      setErr("Enter your name first.");
+      return;
+    }
     setBusy(true);
     setErr(null);
     try {
-      const r = await joinRoom(roomId, name.trim());
+      const r = await joinRoom(roomId, n);
       storeToken(roomId, r.player_token);
-      localStorage.setItem("mp:lastName", name.trim());
+      localStorage.setItem("mp:lastName", n);
       onJoined(roomId, r.player_token, r.seat);
     } catch (e) {
       setErr((e as Error).message);
-    } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div
-      className="flex flex-col items-center justify-center h-screen w-screen text-text px-4"
-      style={{
-        background:
-          "radial-gradient(ellipse at 50% 25%, #1f4d34 0%, #0c2618 55%, #050f0a 100%)",
-      }}
-    >
-      <motion.h1
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="font-chunky font-black text-4xl md:text-5xl mb-2"
-        style={{ color: "var(--accent)" }}
-      >
-        JOIN ROOM
-      </motion.h1>
-      <p className="opacity-70 mb-8 tracking-[0.3em] text-sm">
-        ROOM <strong className="opacity-100">{roomId}</strong>
-      </p>
-      <input
-        autoFocus
-        placeholder="Your name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        maxLength={20}
-        className="px-4 py-3 rounded-lg text-black w-72 text-lg outline-none"
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !busy && name.trim()) submit();
-        }}
-      />
-      {err && <p className="mt-3 text-red-400 text-sm">{err}</p>}
-      <div className="mt-6 flex gap-3">
-        <button
-          onClick={onCancel}
-          className="font-chunky text-sm tracking-[0.3em] px-6 py-3 rounded-full border border-white/30 text-white/90"
-        >
-          CANCEL
-        </button>
-        <motion.button
-          whileHover={{ scale: 1.04 }}
-          whileTap={{ scale: 0.96 }}
-          onClick={submit}
-          disabled={busy || !name.trim()}
-          className="font-chunky text-sm tracking-[0.3em] px-8 py-3 rounded-full disabled:opacity-50"
-          style={{
-            background: "linear-gradient(180deg, var(--accent) 0%, #d4a01b 100%)",
-            color: "var(--bg)",
-          }}
-        >
-          {busy ? "JOINING…" : "JOIN"}
-        </motion.button>
-      </div>
+    <div className="ward pg pg-w-narrow">
+      <PregameHeader subtitle="The Virus! card game · online" />
+      <main className="pg-narrow">
+        <CardFan keys={["virus-green", "organ-red", "medicine-blue"]} />
+        <section className="pg-choice" aria-labelledby="joinTitle">
+          <p className="pg-kicker">Multiplayer table · invite</p>
+          <h2 id="joinTitle">
+            Join room <span className="pg-code-inline">{roomId}</span>
+          </h2>
+          <p className="pg-desc">
+            Pick the name the others will see. The host starts once everyone is ready; empty seats become bots.
+          </p>
+          <form className="pg-form" onSubmit={submit}>
+            <label className="pg-label" htmlFor="joinName">
+              Your name
+            </label>
+            <input
+              id="joinName"
+              className="pg-input"
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={NAME_MAX}
+              autoComplete="nickname"
+              placeholder="e.g. Dr. Ada"
+            />
+            {err && (
+              <p className="pg-err" role="alert">
+                {err}
+              </p>
+            )}
+            <div className="pg-btns">
+              <button type="button" className="pg-btn ghost" onClick={onCancel}>
+                Back
+              </button>
+              <button type="submit" className="pg-btn" disabled={busy}>
+                {busy ? "Joining…" : "Join"}
+              </button>
+            </div>
+          </form>
+        </section>
+      </main>
     </div>
   );
 }

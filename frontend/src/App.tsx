@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import Game from "./pages/Game";
 import NewGame from "./pages/NewGame";
-import MultiplayerLanding from "./pages/MultiplayerLanding";
 import JoinRoom from "./pages/JoinRoom";
 import Lobby from "./pages/Lobby";
 import { useStore } from "./game/store";
 import { connectRoomWs } from "./game/ws";
 import { loadToken } from "./game/room";
+import { leaveGame, startSoloGame } from "./game/actions";
+import type { Mode } from "./three/contract";
 
-type Screen = "home" | "mp_landing" | "join" | "lobby" | "game";
+type Screen = "home" | "join" | "lobby" | "game";
 
 function detectInitial(): { screen: Screen; roomId?: string } {
   const m = location.pathname.match(/^\/join\/([A-Z0-9]{4})$/i);
@@ -23,6 +24,8 @@ export default function App() {
   const setRoomContext = useStore((s) => s.setRoomContext);
   const clearRoom = useStore((s) => s.clearRoom);
   const playerToken = useStore((s) => s.playerToken);
+  /** bumped to make Home scroll to and focus its multiplayer panel */
+  const [focusMp, setFocusMp] = useState(0);
 
   // If we landed at /join/<id> and a token is already cached for that room,
   // jump straight to lobby without re-entering the name.
@@ -39,18 +42,6 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function onSoloStart(_gameId: string) {
-    setScreen("game");
-  }
-
-  function onMpCreated(rid: string, token: string, seat: number) {
-    setRoomContext(rid, token, seat);
-    connectRoomWs(rid, token);
-    setRoomId(rid);
-    history.replaceState({}, "", "/");
-    setScreen("lobby");
-  }
-
   function onJoined(rid: string, token: string, seat: number) {
     setRoomContext(rid, token, seat);
     connectRoomWs(rid, token);
@@ -64,15 +55,6 @@ export default function App() {
     history.replaceState({}, "", "/");
     setRoomId(null);
     setScreen("home");
-  }
-
-  if (screen === "mp_landing") {
-    return (
-      <MultiplayerLanding
-        onCreated={onMpCreated}
-        onCancel={() => setScreen("home")}
-      />
-    );
   }
 
   if (screen === "join" && roomId) {
@@ -99,12 +81,29 @@ export default function App() {
     );
   }
 
-  if (screen === "game") return <Game />;
+  // Leaving a game from its header (mode switch / New game). Game asks for confirmation first.
+  function playMode(mode: Mode) {
+    leaveGame();
+    setRoomId(null);
+    if (mode === "mp") {
+      setScreen("home");
+      setFocusMp((n) => n + 1);
+      return;
+    }
+    setScreen("game");
+    startSoloGame().catch((e) => useStore.getState().setToast((e as Error).message));
+  }
+
+  if (screen === "game") {
+    return (
+      <Game
+        onNewGame={() => playMode(useStore.getState().room ? "mp" : "solo")}
+        onSwitchMode={playMode}
+      />
+    );
+  }
 
   return (
-    <NewGame
-      onStart={onSoloStart}
-      onMultiplayer={() => setScreen("mp_landing")}
-    />
+    <NewGame onSoloStarted={() => setScreen("game")} onRoomEntered={onJoined} focusMp={focusMp} />
   );
 }

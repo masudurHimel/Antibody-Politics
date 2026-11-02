@@ -41,3 +41,21 @@ def test_ws_play_round_trip_advances_to_bot_turn():
                 break
         assert seen_action
         assert seen_bot_thinking
+
+
+def test_ws_solo_set_pace_reaches_driver(monkeypatch):
+    from app.driver import GameDriver
+    calls = []
+    monkeypatch.setattr(GameDriver, "set_pace", lambda self, factor: calls.append(factor))
+    client = TestClient(app)
+    created = client.post("/api/games", json={"seed": 7}).json()
+    with client.websocket_connect(f"/ws/games/{created['game_id']}") as ws:
+        ws.receive_json()  # snapshot
+        ws.send_json({"type": "set_pace", "factor": 1.7})
+        ws.send_json({"type": "bogus"})
+        while True:
+            msg = ws.receive_json()
+            if msg["type"] == "error":
+                break
+        assert msg["message"] == "unknown bogus", "set_pace must not produce an error"
+    assert calls == [1.7]

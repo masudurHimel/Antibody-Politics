@@ -44,18 +44,21 @@ def build_deck() -> list[Card]:
     return deck
 
 
-def shuffle_into(deck: list[Card], discard: list[Card], rng: random.Random) -> None:
-    """When the deck is empty, fold the discard back into it (shuffled)."""
+def flip_discard_into(deck: list[Card], discard: list[Card]) -> None:
+    """When the deck is empty, flip the discard pile over to form the new deck.
+
+    Official rule: no reshuffle. The bottom of the discard pile (discard[0])
+    becomes the top of the deck (deck[-1], the next card drawn).
+    """
     if deck:
         return
-    rng.shuffle(discard)
-    deck.extend(discard)
+    deck.extend(reversed(discard))
     discard.clear()
 
 
-def draw_one(deck: list[Card], discard: list[Card], rng: random.Random) -> Optional[Card]:
+def draw_one(deck: list[Card], discard: list[Card]) -> Optional[Card]:
     if not deck:
-        shuffle_into(deck, discard, rng)
+        flip_discard_into(deck, discard)
     if not deck:
         return None
     return deck.pop()

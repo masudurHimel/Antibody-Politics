@@ -72,3 +72,24 @@ def test_has_won_false_with_infected_organ():
     ]
     p = Player(idx=0, name="me", is_bot=False, hand=[], body=body)
     assert not p.has_won()
+
+
+def test_has_won_with_five_healthy_organs():
+    body = [
+        Organ(id=f"o{i}", color=c, attached=[])
+        for i, c in enumerate([Color.RED, Color.GREEN, Color.BLUE, Color.YELLOW, Color.MULTI])
+    ]
+    p = Player(idx=0, name="me", is_bot=False, hand=[], body=body)
+    assert p.has_won()
+
+
+def test_has_won_with_five_organs_multi_covers_infected_color():
+    body = [
+        Organ(id="o0", color=Color.RED, attached=[make_card(type=CardType.VIRUS, color=Color.RED)]),
+        Organ(id="o1", color=Color.GREEN, attached=[]),
+        Organ(id="o2", color=Color.BLUE, attached=[]),
+        Organ(id="o3", color=Color.YELLOW, attached=[]),
+        Organ(id="o4", color=Color.MULTI, attached=[]),
+    ]
+    p = Player(idx=0, name="me", is_bot=False, hand=[], body=body)
+    assert p.has_won()

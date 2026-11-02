@@ -90,6 +90,12 @@ def make_ws_router(
                 kind = msg.get("type")
                 if kind == "pong":
                     continue
+                if kind == "set_pace":
+                    try:
+                        driver.set_pace(msg["factor"])
+                    except (KeyError, TypeError, ValueError):
+                        await ws.send_json({"type": "error", "code": "bad_payload", "message": "set_pace needs a numeric factor"})
+                    continue
                 cur = store.get(game_id)
                 if cur is None:
                     await ws.send_json({"type": "error", "code": "not_found", "message": "game vanished"})
@@ -180,7 +186,7 @@ def make_ws_router(
                 while True:
                     msg = await ws.receive_json()
                     kind = msg.get("type")
-                    if kind == "pong":
+                    if kind in ("pong", "set_pace"):  # pace is solo-only; rooms keep the shared default
                         continue
                     room = rooms.get(room_id)
                     state = store_getter().get(room.game_id) if room and room.game_id else None
