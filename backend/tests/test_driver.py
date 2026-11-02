@@ -257,3 +257,19 @@ async def test_per_viewer_snapshots_hide_other_hands():
     assert snap0["players"][1]["hand"] is None
     assert snap1["players"][1]["hand"] is not None
     assert snap1["players"][0]["hand"] is None
+
+
+@pytest.mark.parametrize("factor, expected_ms", [
+    (0.45, 450),   # fast
+    (1, 1000),     # normal
+    (1.7, 1700),   # relaxed
+    (0.1, 300),    # clamped low
+    (9, 2500),     # clamped high
+])
+def test_set_pace_scales_bot_floor_from_base(factor, expected_ms):
+    driver = GameDriver(room_id="solo-x", game_id="g", game_store=InMemoryStore(),
+                        room_store=InMemoryRoomStore(), broadcaster=Broadcaster(),
+                        floor_ms=1000)
+    driver.set_pace(0.45)
+    driver.set_pace(factor)  # scales the base floor, not the previously scaled one
+    assert driver.floor_ms == expected_ms

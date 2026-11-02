@@ -74,4 +74,6 @@ export type ClientMessage =
   | { type: "play"; card_id: string; targets: Record<string, unknown> }
   | { type: "discard"; card_ids: string[] }
   | { type: "pass" }
-  | { type: "pong" };
+  | { type: "pong" }
+  /** solo only: pace multiplier for bot thinking time (1.7 relaxed, 1 normal, 0.45 fast) */
+  | { type: "set_pace"; factor: number };

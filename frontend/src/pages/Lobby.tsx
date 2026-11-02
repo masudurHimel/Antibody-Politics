@@ -1,8 +1,34 @@
-import { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../game/store";
-import { Avatar } from "../components/Avatar";
 import { setReady, startRoom } from "../game/room";
+import { PregameHeader } from "./pregameUi";
+import { SEAT_TINTS, initials, seatStatus, startBlockReason } from "./pregame";
+import type { RoomPlayerView } from "../game/types";
+
+function SeatPlate({ seat, p, mine }: { seat: number; p: RoomPlayerView | undefined; mine: boolean }) {
+  const status = seatStatus(p);
+  const ready = !!p && !p.is_bot && p.ready;
+  return (
+    <li className={`pg-seat${p ? "" : " empty"}${ready ? " ready" : ""}${mine ? " mine" : ""}`}>
+      <span className="pg-av" style={p ? { background: SEAT_TINTS[seat % SEAT_TINTS.length] } : undefined} aria-hidden="true">
+        {p ? initials(p.name) : "+"}
+      </span>
+      <span className="who">
+        <b>
+          {p ? p.name : `Seat ${seat + 1}`}
+          {p?.is_host && (
+            <span className="pg-star" title="Host" aria-label="host">
+              {" "}
+              ★
+            </span>
+          )}
+        </b>
+        <small>{mine ? `You · ${status}` : status}</small>
+      </span>
+      {ready && <span className="pg-dot" aria-hidden="true" />}
+    </li>
+  );
+}
 
 export default function Lobby({
   roomId,
@@ -19,7 +45,9 @@ export default function Lobby({
   const mySeat = useStore((s) => s.mySeat);
   const toast = useStore((s) => s.toast);
   const [starting, setStarting] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [inviteBase, setInviteBase] = useState<string>(location.origin);
+  const linkRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch("/api/host_url")
@@ -30,18 +58,21 @@ export default function Lobby({
       .catch(() => {});
   }, []);
 
-  const me = useMemo(
-    () => room?.players.find((p) => p.seat === mySeat) ?? null,
-    [room, mySeat],
-  );
+  const me = useMemo(() => room?.players.find((p) => p.seat === mySeat) ?? null, [room, mySeat]);
   const isHost = !!me?.is_host;
-  const humans = room?.players.filter((p) => !p.is_bot) ?? [];
-  const allReady = humans.length > 0 && humans.every((p) => p.ready);
   const inviteUrl = `${inviteBase.replace(/\/$/, "")}/join/${roomId}`;
+  const blockReason = room ? startBlockReason(room.players, mySeat) : null;
+  const humans = room?.players.filter((p) => !p.is_bot).length ?? 0;
 
   useEffect(() => {
     if (room?.status === "playing") onStarted();
   }, [room?.status, onStarted]);
+
+  useEffect(() => {
+    if (!copied) return;
+    const id = window.setTimeout(() => setCopied(false), 2000);
+    return () => window.clearTimeout(id);
+  }, [copied]);
 
   async function toggleReady() {
     if (!me) return;
@@ -53,7 +84,7 @@ export default function Lobby({
   }
 
   async function start() {
-    if (starting) return;
+    if (starting || blockReason) return;
     setStarting(true);
     try {
       await startRoom(roomId, token);
@@ -66,154 +97,118 @@ export default function Lobby({
   async function copyInvite() {
     try {
       await navigator.clipboard.writeText(inviteUrl);
-      useStore.getState().setToast("Invite link copied");
-      setTimeout(() => useStore.getState().setToast(null), 2000);
+      setCopied(true);
     } catch {
-      useStore.getState().setToast(inviteUrl);
+      // No clipboard access (e.g. plain http on a LAN IP): select the link so it can be copied by hand.
+      linkRef.current?.select();
     }
   }
 
+  const leave = (
+    <button type="button" className="ghost-btn" onClick={onLeave}>
+      Leave room
+    </button>
+  );
+
   if (!room) {
     return (
-      <div
-        className="h-screen w-screen grid place-items-center text-text"
-        style={{
-          background:
-            "radial-gradient(ellipse at 50% 25%, #1f4d34 0%, #0c2618 55%, #050f0a 100%)",
-        }}
-      >
-        <div className="font-chunky tracking-[0.4em] opacity-60">CONNECTING…</div>
+      <div className="ward pg pg-w-lobby">
+        <PregameHeader subtitle="Multiplayer table · lobby">{leave}</PregameHeader>
+        <main className="pg-narrow">
+          <p className="pg-connecting" role="status">
+            Connecting to room {roomId}…
+          </p>
+        </main>
       </div>
     );
   }
 
   return (
-    <div
-      className="min-h-screen w-screen text-text"
-      style={{
-        background:
-          "radial-gradient(ellipse at 50% 25%, #1f4d34 0%, #0c2618 55%, #050f0a 100%)",
-      }}
-    >
-      <div className="max-w-2xl mx-auto pt-10 px-4 pb-16">
-        <motion.h1
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="font-chunky font-black text-4xl md:text-5xl mb-2"
-          style={{ color: "var(--accent)" }}
-        >
-          ROOM {room.id}
-        </motion.h1>
-        <p className="opacity-70 mb-8 text-sm">
-          Waiting for players… empty seats become bots when you start.
-        </p>
+    <div className="ward pg pg-w-lobby">
+      <PregameHeader subtitle="Multiplayer table · lobby">{leave}</PregameHeader>
+      <main className="pg-lobby">
+        <section className="pg-choice pg-invite" aria-labelledby="codeLabel">
+          <p className="pg-kicker" id="codeLabel">
+            Room code
+          </p>
+          <p className="pg-bigcode" aria-label={`Room code ${room.id.split("").join(" ")}`}>
+            {room.id}
+          </p>
+          <p className="pg-desc">Send friends this link, or have them enter the code on the home screen.</p>
+          <div className="pg-row">
+            <input
+              ref={linkRef}
+              className="pg-input pg-link"
+              value={inviteUrl}
+              readOnly
+              aria-label="Invite link"
+              onFocus={(e) => e.currentTarget.select()}
+            />
+            <button type="button" className="pg-btn" onClick={copyInvite}>
+              {copied ? "Copied ✓" : "Copy invite link"}
+            </button>
+          </div>
+          <span className="pg-sr" role="status">
+            {copied ? "Invite link copied" : ""}
+          </span>
+        </section>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-8">
-          {[0, 1, 2, 3].map((seat) => {
-            const p = room.players.find((x) => x.seat === seat);
-            return (
-              <motion.div
-                key={seat}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: seat * 0.05 }}
-                className="rounded-xl p-4 flex items-center gap-3 border"
-                style={{
-                  background: "rgba(255,255,255,0.04)",
-                  borderColor: "rgba(255,255,255,0.10)",
-                }}
-              >
-                {p ? (
-                  <>
-                    <Avatar seed={p.name} size={48} />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-chunky tracking-wider truncate">
-                        {p.name}{" "}
-                        {p.is_host && (
-                          <span style={{ color: "var(--accent)" }}>★</span>
-                        )}
-                      </div>
-                      <div className="text-xs opacity-60 tracking-widest">
-                        {p.is_bot
-                          ? "BOT"
-                          : p.ready
-                            ? "READY"
-                            : "WAITING"}
-                      </div>
-                    </div>
-                    {!p.is_bot && p.ready && (
-                      <div
-                        className="w-2 h-2 rounded-full"
-                        style={{ background: "#3aa15a" }}
-                      />
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <div className="w-12 h-12 rounded-full border border-dashed border-white/20" />
-                    <div className="flex-1 italic opacity-50 text-sm">
-                      Empty — will be filled by a bot
-                    </div>
-                  </>
-                )}
-              </motion.div>
-            );
-          })}
-        </div>
+        <section className="pg-choice" aria-labelledby="seatsTitle">
+          <div className="pg-seats-head">
+            <h2 id="seatsTitle">Seats</h2>
+            <small>{humans}/4 players · empty seats become bots</small>
+          </div>
+          <ul className="pg-seats">
+            {[0, 1, 2, 3].map((seat) => (
+              <SeatPlate key={seat} seat={seat} p={room.players.find((x) => x.seat === seat)} mine={seat === mySeat} />
+            ))}
+          </ul>
 
-        <div className="flex flex-wrap gap-3 justify-center">
-          <button
-            onClick={copyInvite}
-            className="font-chunky text-xs tracking-[0.3em] px-5 py-3 rounded-full border border-white/30 text-white/90"
-          >
-            COPY INVITE
-          </button>
-          <motion.button
-            whileTap={{ scale: 0.96 }}
-            onClick={toggleReady}
-            className="font-chunky text-xs tracking-[0.3em] px-6 py-3 rounded-full"
-            style={
-              me?.ready
-                ? {
-                    background: "rgba(255,255,255,0.15)",
-                    color: "var(--text)",
-                  }
-                : {
-                    background:
-                      "linear-gradient(180deg, var(--accent) 0%, #d4a01b 100%)",
-                    color: "var(--bg)",
-                  }
-            }
-          >
-            {me?.ready ? "UNREADY" : "READY"}
-          </motion.button>
-          {isHost && (
-            <motion.button
-              whileTap={{ scale: 0.96 }}
-              onClick={start}
-              disabled={!allReady || starting}
-              className="font-chunky text-xs tracking-[0.3em] px-8 py-3 rounded-full disabled:opacity-40"
-              style={{
-                background:
-                  "linear-gradient(180deg, var(--accent) 0%, #d4a01b 100%)",
-                color: "var(--bg)",
-              }}
+          <div className="pg-ready">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={!!me?.ready}
+              className="pg-switch"
+              onClick={toggleReady}
+              disabled={!me}
             >
-              {starting ? "STARTING…" : "START"}
-            </motion.button>
-          )}
-          <button
-            onClick={onLeave}
-            className="font-chunky text-xs tracking-[0.3em] px-5 py-3 rounded-full border border-white/30 text-white/90"
-          >
-            LEAVE
-          </button>
-        </div>
+              <span className="pg-knob" aria-hidden="true" />
+              <span>I'm ready</span>
+            </button>
+            <span className={`pg-state${me?.ready ? " on" : ""}`}>{me?.ready ? "Ready" : "Not ready"}</span>
+          </div>
 
-        {toast && (
-          <div className="mt-6 text-center text-sm opacity-80">{toast}</div>
-        )}
-      </div>
+          <div className="pg-start">
+            {isHost ? (
+              <>
+                <button
+                  type="button"
+                  className="pg-btn pg-start-btn"
+                  onClick={start}
+                  disabled={!!blockReason || starting}
+                  aria-describedby="startHelp"
+                >
+                  {starting ? "Starting…" : "Start game"}
+                </button>
+                <p id="startHelp" className="pg-help" aria-live="polite">
+                  {blockReason ?? "Everyone's ready. Empty seats will be filled by bots."}
+                </p>
+              </>
+            ) : (
+              <p className="pg-wait" aria-live="polite">
+                {me?.ready ? "Waiting for the host to start" : "Get ready, then wait for the host to start"}
+              </p>
+            )}
+          </div>
+          <p className="pg-rule">The host (★) starts the game once every player is ready.</p>
+          {toast && (
+            <p className="pg-err" role="alert">
+              {toast}
+            </p>
+          )}
+        </section>
+      </main>
     </div>
   );
 }

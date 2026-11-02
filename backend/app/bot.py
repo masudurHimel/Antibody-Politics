@@ -20,11 +20,12 @@ def choose_action(snapshot: dict[str, Any], my_seat: int) -> tuple[str, dict[str
         return ("pass", {})
 
     candidates = _enumerate_plays(state, my_seat)
-    if candidates:
-        # heuristic scoring
-        scored = [(heuristic_score(state, my_seat, card, tgt), card, tgt) for card, tgt in candidates]
-        scored.sort(key=lambda x: x[0], reverse=True)
-
+    # heuristic scoring; a play that helps an opponent or hurts me scores <= 0
+    # and is dropped, so the bot discards instead of making it
+    scored = [(heuristic_score(state, my_seat, card, tgt), card, tgt) for card, tgt in candidates]
+    scored = [x for x in scored if x[0] > 0]
+    scored.sort(key=lambda x: x[0], reverse=True)
+    if scored:
         if _needs_search(scored, state, my_seat):
             best = _mcts_lite(state, my_seat, [(c, t) for _, c, t in scored[:3]])
             if best is not None:
@@ -34,7 +35,7 @@ def choose_action(snapshot: dict[str, Any], my_seat: int) -> tuple[str, dict[str
         _, card, tgt = scored[0]
         return ("play", {"card_id": card.id, "targets": tgt})
 
-    # nothing legal to play → discard worst card
+    # nothing worth playing → discard worst card
     worst = _worst_discard(state, my_seat)
     return ("discard", {"card_ids": [worst.id]})
 
@@ -109,7 +110,7 @@ def heuristic_score(state: GameState, my_seat: int, card: Card, tgt: dict[str, A
                 score += 18.0   # vaccinate
             score += _color_priority_bonus(me, organ.color)
         else:
-            score += 2.0  # rarely useful to medicate opponents
+            score -= 40.0  # medicating an opponent only helps them
         return score
 
     if card.type == CardType.VIRUS:
@@ -143,13 +144,27 @@ def heuristic_score(state: GameState, my_seat: int, card: Card, tgt: dict[str, A
             score += _color_priority_bonus(me, organ.color)
             return score
         if kind == TreatmentKind.TRANSPLANT:
-            return 18.0
+            return _transplant_score(state, my_seat, tgt)
         if kind == TreatmentKind.MEDICAL_ERROR:
             target = state.players[tgt["player"]]
             mine_healthy = sum(1 for o in me.body if o.status != OrganStatus.INFECTED)
             theirs_healthy = sum(1 for o in target.body if o.status != OrganStatus.INFECTED)
             return float(theirs_healthy - mine_healthy) * 12.0
     return 0.0
+
+
+def _transplant_score(state: GameState, my_seat: int, tgt: dict[str, Any]) -> float:
+    """Value of a swap for me: my progress gain, or 0 when I'm not part of it."""
+    ends = [tgt["from"], tgt["to"]]
+    mine = next((e for e in ends if e["player"] == my_seat), None)
+    if mine is None:
+        return 0.0
+    other = ends[1] if mine is ends[0] else ends[0]
+    me = state.players[my_seat]
+    give = _organ(me, mine["organ_id"])
+    take = _organ(state.players[other["player"]], other["organ_id"])
+    after = me.model_copy(update={"body": [take if o.id == give.id else o for o in me.body]})
+    return float(_progress(after) - _progress(me)) * 30.0
 
 
 def _color_priority_bonus(me: Player, color: Color) -> float:
@@ -241,24 +256,10 @@ def _unseen_pool(state: GameState, my_seat: int) -> list[Card]:
         for c in p.hand:
             seen_ids.add(c.id)
         for o in p.body:
+            seen_ids.add(o.id)  # a placed organ keeps its deck card's id
             for c in o.attached:
                 seen_ids.add(c.id)
-            # the organ itself was a card in the deck; its id was rewritten on play to "organ-XXX"
-            # so it is not in seen_ids by id. Approximate by removing one ORGAN of that color.
-    # We can't perfectly map back placed organs → original deck IDs because organ IDs are regenerated.
-    # Remove one organ-card of each placed organ's color as approximation.
-    placed_organs = [o for p in state.players for o in p.body]
-    pool = [c for c in full if c.id not in seen_ids]
-    by_color: dict[Color, list[Card]] = {}
-    for c in pool:
-        if c.type == CardType.ORGAN:
-            by_color.setdefault(c.color, []).append(c)
-    for o in placed_organs:
-        bucket = by_color.get(o.color, [])
-        if bucket:
-            victim = bucket.pop()
-            pool.remove(victim)
-    return pool
+    return [c for c in full if c.id not in seen_ids]
 
 
 def _rollout(state: GameState, my_seat: int, card: Card, tgt: dict[str, Any],
@@ -294,7 +295,7 @@ def _rollout(state: GameState, my_seat: int, card: Card, tgt: dict[str, Any],
     while sim.winner_idx is None and plies < max_plies:
         idx = sim.turn_idx
         # pick best heuristic action
-        plays = _enumerate_plays(sim, idx)
+        plays = [ct for ct in _enumerate_plays(sim, idx) if heuristic_score(sim, idx, ct[0], ct[1]) > 0]
         if plays:
             best = max(plays, key=lambda ct: heuristic_score(sim, idx, ct[0], ct[1]))
             try:

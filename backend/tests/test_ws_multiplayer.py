@@ -75,5 +75,38 @@ def test_two_humans_both_receive_action():
         )
         a = ws_a.receive_json()
         b = ws_b.receive_json()
-        assert a["type"] in ("snapshot", "human_thinking", "bot_thinking", "action")
-        assert b["type"] in ("snapshot", "human_thinking", "bot_thinking", "action")
+        # start first broadcasts room_state (status=playing) so lobby clients switch screens
+        game_msgs = ("room_state", "snapshot", "human_thinking", "bot_thinking", "action")
+        assert a["type"] in game_msgs
+        assert b["type"] in game_msgs
+
+
+def test_set_pace_is_ignored_in_multiplayer_rooms(monkeypatch):
+    from app.driver import GameDriver
+    calls = []
+    monkeypatch.setattr(GameDriver, "set_pace", lambda self, factor: calls.append(factor))
+    _reset()
+    client = TestClient(app)
+    host = client.post("/api/rooms", json={"host_name": "A"}).json()
+    bob = client.post(f"/api/rooms/{host['room_id']}/join", json={"name": "B"}).json()
+    for tok in (host["player_token"], bob["player_token"]):
+        client.post(f"/api/rooms/{host['room_id']}/ready", json={"player_token": tok, "ready": True})
+
+    with client.websocket_connect(
+        f"/ws/rooms/{host['room_id']}?token={host['player_token']}"
+    ) as ws_a, client.websocket_connect(
+        f"/ws/rooms/{host['room_id']}?token={bob['player_token']}"
+    ) as ws_b:
+        ws_a.receive_json()
+        ws_b.receive_json()
+        client.post(f"/api/rooms/{host['room_id']}/start", json={"player_token": host["player_token"]})
+        ws_a.send_json({"type": "set_pace", "factor": 0.45})
+        ws_a.send_json({"type": "bogus"})
+        while True:
+            msg = ws_a.receive_json()
+            if msg["type"] == "error":
+                break
+        # set_pace is silently ignored; the first error is for the bogus message
+        assert msg["message"] in ("unknown bogus", "not your turn")
+        assert "set_pace" not in msg["message"]
+    assert calls == []
