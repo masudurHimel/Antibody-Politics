@@ -473,3 +473,19 @@ def test_contagion_moves_multi_virus_onto_any_color():
     apply_play(s, 0, t.id, {})
     assert s.players[0].body[0].status == OrganStatus.FREE
     assert s.players[1].body[0].status == OrganStatus.INFECTED
+
+
+def test_contagion_maximizes_viruses_moved():
+    """Rulebook: transfer *as many viruses as you can*. A greedy first-fit would send the
+    multi virus to the only red target and strand the red virus."""
+    s = _empty_state()
+    s.players[0].body.append(Organ(id="o-g", color=Color.GREEN, attached=[_card("vM", CardType.VIRUS, Color.MULTI)]))
+    s.players[0].body.append(Organ(id="o-r", color=Color.RED, attached=[_card("vR", CardType.VIRUS, Color.RED)]))
+    s.players[1].body.append(Organ(id="o-r1", color=Color.RED, attached=[]))
+    s.players[1].body.append(Organ(id="o-b1", color=Color.BLUE, attached=[]))
+    t = _card("t-5", CardType.TREATMENT, Color.MULTI, tk=TreatmentKind.CONTAGION)
+    s.players[0].hand.append(t)
+    apply_play(s, 0, t.id, {})
+    assert all(o.status == OrganStatus.FREE for o in s.players[0].body)
+    assert all(o.status == OrganStatus.INFECTED for o in s.players[1].body)
+    assert [c.id for c in s.players[1].body[0].attached] == ["vR"]

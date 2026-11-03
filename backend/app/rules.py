@@ -248,6 +248,44 @@ def _transplant_legal(src: Player, dst: Player, o_src: Organ, o_dst: Organ) -> b
     return o_dst.color not in src_colors and o_src.color not in dst_colors
 
 
+def _contagion_moves(state: GameState, source: Player) -> list[tuple[Organ, Card, Player, Organ]]:
+    """Rulebook: transfer *as many viruses as you can* onto other players' free organs.
+
+    Maximum bipartite matching (Kuhn's augmenting paths) between the source's viruses
+    and opponents' free organs, so a multi virus never strands a single-color one.
+    Candidates are tried in seat/body order, keeping the result deterministic.
+    """
+    sources = [
+        (o, next(c for c in o.attached if c.type == CardType.VIRUS))
+        for o in source.body if o.status == OrganStatus.INFECTED
+    ]
+    targets = [
+        (p, o) for p in state.players if p.idx != source.idx
+        for o in p.body if o.status == OrganStatus.FREE
+    ]
+    edges = [
+        [j for j, (_, o) in enumerate(targets) if _organ_color_matches(virus.color, o.color)]
+        for _, virus in sources
+    ]
+    match_of_target: dict[int, int] = {}
+
+    def augment(i: int, seen: set[int]) -> bool:
+        for j in edges[i]:
+            if j in seen:
+                continue
+            seen.add(j)
+            if j not in match_of_target or augment(match_of_target[j], seen):
+                match_of_target[j] = i
+                return True
+        return False
+
+    for i in range(len(sources)):
+        augment(i, set())
+
+    moves = [(sources[i][0], sources[i][1], *targets[j]) for j, i in match_of_target.items()]
+    return sorted(moves, key=lambda m: source.body.index(m[0]))
+
+
 def _apply_treatment(state: GameState, source: Player, card: Card, targets: dict[str, Any]) -> list[str]:
     kind = card.treatment_kind
     _pop_card_from_hand(source, card.id)
@@ -303,30 +341,10 @@ def _apply_treatment(state: GameState, source: Player, card: Card, targets: dict
 
     if kind == TreatmentKind.CONTAGION:
         events: list[str] = []
-        # Iterate over source's infected organs; for each, find first free matching-color organ on an opponent
-        for src_organ in source.body:
-            if src_organ.status != OrganStatus.INFECTED:
-                continue
-            virus = next(c for c in src_organ.attached if c.type == CardType.VIRUS)
-            # find target
-            chosen: tuple[Player, Organ] | None = None
-            for p in state.players:
-                if p.idx == source.idx:
-                    continue
-                for o in p.body:
-                    if o.status != OrganStatus.FREE:
-                        continue
-                    if not _organ_color_matches(virus.color, o.color):
-                        continue
-                    chosen = (p, o)
-                    break
-                if chosen:
-                    break
-            if chosen:
-                tgt_player, tgt_organ = chosen
-                src_organ.attached.remove(virus)
-                tgt_organ.attached.append(virus)
-                events.append(f"{source.name} spread a virus to {_whose(tgt_player, source)} {_organ_name(tgt_organ.color)}")
+        for src_organ, virus, tgt_player, tgt_organ in _contagion_moves(state, source):
+            src_organ.attached.remove(virus)
+            tgt_organ.attached.append(virus)
+            events.append(f"{source.name} spread a virus to {_whose(tgt_player, source)} {_organ_name(tgt_organ.color)}")
         state.discard.append(card)
         if not events:
             events.append(f"{source.name} played Contagion, but no virus could move")
