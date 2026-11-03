@@ -51,10 +51,10 @@ def test_treatment_distribution():
     assert len(treats) == 10
     by_kind = Counter(c.treatment_kind for c in treats)
     assert by_kind[TreatmentKind.TRANSPLANT] == 3
-    assert by_kind[TreatmentKind.ORGAN_THIEF] == 1
+    assert by_kind[TreatmentKind.ORGAN_THIEF] == 3
     assert by_kind[TreatmentKind.CONTAGION] == 2
     assert by_kind[TreatmentKind.LATEX_GLOVE] == 1
-    assert by_kind[TreatmentKind.MEDICAL_ERROR] == 3
+    assert by_kind[TreatmentKind.MEDICAL_ERROR] == 1
 
 
 def test_card_ids_are_unique():

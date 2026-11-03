@@ -96,3 +96,12 @@ Lightweight ADRs. One row per decision. Update **Status** when reversing or supe
 - **Context:** User preference: spec / decisions / tasks should live as files under one folder, not separate folders.
 - **Decision:** `docs/specs/spec.md`, `docs/specs/decisions.md`, `docs/specs/tasks.md`. Changelog at `docs/changelog.md`.
 - **Consequences:** Brainstorming-skill default path (`docs/superpowers/specs/...`) is overridden by explicit user preference, which is the correct precedence.
+
+## ADR-0011 — Contagion resolves by maximum matching
+
+- **Status:** Accepted
+- **Context:** The rulebook says Contagion transfers "as many viruses as you can" onto other players' free organs. The first-fit loop could send a multicoloured virus to the only matching target of a single-colour virus and move fewer viruses than allowed.
+- **Decision:** `rules._contagion_moves` computes a maximum bipartite matching (viruses → opponents' free organs), trying candidates in seat/body order so the result stays deterministic. Contagion still takes no targets from the client.
+- **Alternatives considered:**
+  - Let the player assign each virus — closer to the tabletop, but needs a new target payload and multi-step picker in the UI; out of scope for this fix.
+- **Consequences:** The number of viruses moved is always the rulebook maximum. Which opponent receives each virus is still chosen by the engine, not the player.

@@ -241,3 +241,6 @@ frontend/coverage/
 # Editor / OS
 .DS_Store
 *.pyc
+
+# Local rulebook photos / reference material (not tracked)
+sources/

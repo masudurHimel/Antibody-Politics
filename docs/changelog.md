@@ -8,6 +8,10 @@ All notable changes to Antibody Politics are recorded here. Format follows [Keep
 - 2026-05-16 — Initial design spec (`docs/specs/spec.md`), architectural decisions (`docs/specs/decisions.md`), and Phase 1 task roadmap (`docs/specs/tasks.md`).
 - 2026-05-16 — Source reference images committed under `sources/`.
 
+### Fixed
+- 2026-11-03 — Treatment counts now match the official rulebook: 3 Organ Thief (was 1) and 1 Medical Error (was 3).
+- 2026-11-03 — Contagion moves the maximum number of viruses ("as many as you can"), so a multicoloured virus no longer strands a single-colour one.
+
 ### Decisions of note
 - ADR-0001 React + Vite + Tailwind + Framer Motion as the frontend stack.
 - ADR-0002 FastAPI + Pydantic v2 + uvicorn as the backend stack.

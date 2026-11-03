@@ -138,9 +138,9 @@ Canonical 68-card composition per the official Tranjis Virus! rules:
 | Medicines   | 4   | 4     | 4    | 4      | 4     | 20    |
 | Treatments  | —   | —     | —    | —      | —     | 10    |
 
-Treatments breakdown: 3 Transplant, 1 Organ Thief, 2 Contagion, 1 Latex Glove, 3 Medical Error. *(Exact counts to be verified against the official rulebook during implementation; the spec covers the 5 treatment kinds and the 68-card total.)*
+Treatments breakdown (verified against the official rulebook): 3 Transplant, 3 Organ Thief, 2 Contagion, 1 Latex Glove, 1 Medical Error.
 
-Reshuffle policy: when the deck is empty, shuffle the discard pile (minus the top card if used as a marker — we do not use a top-card marker, so the whole discard pile is shuffled into the new deck).
+Empty-deck policy (official rulebook): when the deck runs out, flip the discard pile over to form the new deck — no reshuffle.
 
 Randomness: a single `random.Random(seed)` per game, seed logged to `GameState.seed`. Bots use a separate RNG to keep deal randomness independent of bot choices.
 

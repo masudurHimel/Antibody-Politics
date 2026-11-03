@@ -34,12 +34,12 @@ def build_deck() -> list[Card]:
         _add(deck, CardType.MEDICINE, color, 4)
     _add(deck, CardType.MEDICINE, Color.MULTI, 4)
 
-    # Treatments: 3 Transplant, 1 Organ Thief, 2 Contagion, 1 Latex Glove, 3 Medical Error
+    # Treatments (official rulebook): 3 Transplant, 3 Organ Thief, 2 Contagion, 1 Latex Glove, 1 Medical Error
     _add(deck, CardType.TREATMENT, Color.MULTI, 3, treatment_kind=TreatmentKind.TRANSPLANT)
-    _add(deck, CardType.TREATMENT, Color.MULTI, 1, treatment_kind=TreatmentKind.ORGAN_THIEF)
+    _add(deck, CardType.TREATMENT, Color.MULTI, 3, treatment_kind=TreatmentKind.ORGAN_THIEF)
     _add(deck, CardType.TREATMENT, Color.MULTI, 2, treatment_kind=TreatmentKind.CONTAGION)
     _add(deck, CardType.TREATMENT, Color.MULTI, 1, treatment_kind=TreatmentKind.LATEX_GLOVE)
-    _add(deck, CardType.TREATMENT, Color.MULTI, 3, treatment_kind=TreatmentKind.MEDICAL_ERROR)
+    _add(deck, CardType.TREATMENT, Color.MULTI, 1, treatment_kind=TreatmentKind.MEDICAL_ERROR)
 
     return deck
 
